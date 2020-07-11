@@ -7,7 +7,7 @@ System for fully autonomous home-cage mouse behavioral and optogenetic experimen
 - A fully autonomous workflow for mouse behavioral and optogenetic experiment
 
 ## System Overview
-<img src="https://github.com/NuoLiLabBCM/Autocage/blob/master/Design%20files/Assemble%20v42.png" width="464" height="378" />
+<img src="https://github.com/NuoLiLabBCM/Autocage/blob/master/Design%20files/media/fig1c.png" width="464" height="378" />
 
 ## Citation
 Hao et al. (2020) Fully autonomous home-cage mouse behavioral and optogenetic experiments
