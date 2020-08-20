@@ -22,8 +22,21 @@ Motor position not updated on GUI when plugged in. Motor position should be upda
     
 
 8/20/2020
-When plugging in SD card, user should hit 'reset', otherwise the system will run previously saved variables, which produces a range of weird behaviors
+When plugging in SD card, user should hit 'reset', otherwise the system will run previously saved variables,
+which produces a range of weird behaviors
     (this will be fixed in version 1.0 update)
+
+
+8/20/2020
+Documentation of Testing should include a brief instruction on how to upload Arduino program that include the 
+following information:
+1) Where to install Arduino program
+2) install Arduino Due board from "Tool"
+3) they need to select Arduino Due, be plugged into the programing port, and select the correct PORT 
+4) The user needs to copy the provided library into the library of Arduino program.
+5) A brief instruction on how to open RealTerm and connect to the Arduino (Note that when running RealTerm, 
+   Arduino needs to be plugged into regular port, NOT programming port.
+   
 
 
 
