@@ -11,6 +11,10 @@ follow SD card. GUI should have NO MEMORY
 
 
 8/20/2020
+For a new mouse, in protocol 0, the program runs well when connected to the GUI. However, when GUI is disconnected, the programm stops running.
+
+
+8/20/2020
 Without plugging into GUI, plug in SD card with "final config files". Hit reset, program does not run normally standalone. However, it works
 well when connecting to GUI.
     Due to noise when power is plugged in, triggering false 'early licks'.
