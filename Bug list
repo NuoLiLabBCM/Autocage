@@ -1,1 +1,32 @@
+8/20/2020
+Without SD card, the system is running some sort of statemachine. It should be stationary
+    (this will be fixed in version 1.0 update)
+
+
+8/20/2020
+GUI saves the progress locally. GUI do not refresh when disconnecting. If connecting to a new GUI window using a previously used mouse name, 
+the program pick up the progress from the previous box connected to GUI. Progress should be tied to the SD card, not to the board. GUI should 
+follow SD card. GUI should have NO MEMORY
+    (this will be fixed in version 1.0 update)
+
+
+8/20/2020
+Without plugging into GUI, plug in SD card with "final config files". Hit reset, program does not run normally standalone. However, it works
+well when connecting to GUI.
+    Due to noise when power is plugged in, triggering false 'early licks'.
+    
+
+8/20/2020
+Motor position not updated on GUI when plugged in. Motor position should be updated whenever a cage is selected.
+    (this will be fixed in version 1.0 update)
+    
+
+8/20/2020
+When plugging in SD card, user should hit 'reset', otherwise the system will run previously saved variables, which produces a range of weird behaviors
+    (this will be fixed in version 1.0 update)
+
+
+
+====================== Resolved =============================
+(Please move the items above to below once fixed).
 
