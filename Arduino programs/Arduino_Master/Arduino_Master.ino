@@ -99,9 +99,9 @@ boolean SwitchR_CurrentStatus;
 int motor_retract_step               = 10; // 0-255
 bool is_motor_advance                = 0;
 unsigned int last_advance_reward_num = 0;
-int lick_num_before_motor_retract1   = 15;
-int lick_num_before_motor_retract2   = 25;
-int lick_num_before_motor_retract3   = 35;
+int lick_num_before_motor_retract1   = 10;
+int lick_num_before_motor_retract2   = 20;
+int lick_num_before_motor_retract3   = 30;
 
 boolean headfixation_flag           = 0;
 boolean last_headfixation_flag      = 0;
@@ -199,7 +199,7 @@ typedef struct StateMatrices {
   byte PortPWMOutputLines[8] = {53, 8, 7, 6, 5, 4, 3, 2}; // "pwm1": gocue; "pwm2-8": digital
   byte WireDigitalOutputLines[4] = {43, 41, 39, 37};      // "WireState"
   byte ValveDigitalOutputLines[2] = {22, 23};             // "ValveState"
-  byte BncOutputLines[2] = {24, 25};                      // "BNCState"
+  byte BncOutputLines[2] = {10, 11};                      // "BNCState"
 */
 OutputAction RewardOutput;
 OutputAction LeftWaterOutput  = {"ValveState", 1};
@@ -391,11 +391,11 @@ void setup() {
   //    for(int i = 0; i < 20; i++) {
   //    F.Fixation_Outcome [i] = 1;
   //    }
-  //      F.struggle_thres_neg = -6;
-  //      F.struggle_thres_pos = 36;
+   //     F.struggle_thres_neg = -10;
+   //     F.struggle_thres_pos = 42;
   //    F.last_advance_threshold_counter = 0;
   //    F.fixation_interval_max = 30000;
-  //    write_SD_para_F();
+   //   write_SD_para_F();
 
   //  S.currentTrialNum         = 4074;       // current trial number
   //  S.FB_motor_position       = 100;        // Lickport motor Forward/Backward
@@ -2859,7 +2859,7 @@ int AddState(StateMatrix * sma, State * state) {
                 sma->nStates--;
                 return -1;
               }
-              sma->GlobalTimerMatrix[CurrentState][GlobalCounterNumber] = TargetStateNumber;
+              sma->GlobalCounterMatrix[CurrentState][GlobalCounterNumber] = TargetStateNumber;
             }
           } else {
             sma->nStates--;

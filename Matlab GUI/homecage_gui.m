@@ -112,8 +112,8 @@ for cage_i = 1:handles.total_cage_num
     
     % Protocol info: currentProtocol-trialsNumsinThisProtocol-Perf30
     handles.htext_Protocol(cage_i) = uicontrol('style','text',...
-        'String', 'Protocol - TrialNum - 0%',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.025,0.07,0.02]);
+        'String', 'iProt - iTrial - 00%',        'Units', 'normalized',...
+        'Position',[pos(cage_i,1)+0.003,pos(cage_i,2)+0.025,0.048,0.02]);
     %     handles.htext_hf2(cage_i) = uicontrol('style','text',...
     %         'String', '-',        'Units', 'normalized',...
     %         'Position',[pos(cage_i,1)+0.015,pos(cage_i,2)+0.025,0.005,0.02]);
@@ -129,6 +129,13 @@ for cage_i = 1:handles.total_cage_num
     %     handles.htext_percent2(cage_i) = uicontrol('style','text',...
     %         'String', '%',        'Units', 'normalized',...
     %         'Position',[pos(cage_i,1)+0.065,pos(cage_i,2)+0.025,0.005,0.02]);
+    
+    handles.htext_early(cage_i) = uicontrol('style','text',...
+        'String', 'EL:',        'Units', 'normalized',...
+        'Position',[pos(cage_i,1)+0.051,pos(cage_i,2)+0.025,0.01,0.02]);
+    handles.htext_earlylick(cage_i) = uicontrol('style','text',...
+        'String', '00%',        'Units', 'normalized',...
+        'Position',[pos(cage_i,1)+0.061,pos(cage_i,2)+0.025,0.015,0.02]);
     
     % Weight info xx g
     handles.htext_weight1(cage_i) = uicontrol('style','text',...
@@ -339,7 +346,7 @@ start(handles.update_timer);
                 % trial-time and weight mat file to record
                 if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 0
                     handles.matObj{Cage_num} = matfile(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'],'Writable',true);
-                    handles.matObj{Cage_num}.trial_time(1,1:4) = [NaN NaN NaN NaN]; % trial num, datetime,trial type, outcome
+                    handles.matObj{Cage_num}.trial_time(1,1:5) = [NaN NaN NaN NaN NaN]; % trial num, datetime,trial type, outcome, is_earlylick
                     handles.matObj{Cage_num}.weight = NaN(1,121);% 1st col: datetime; 2:121 col: weight data in float (4 bytes/data)
                     handles.matObj{Cage_num}.startDate = handles.db_table{Cage_num}.startDate; % serial datetime % del
                 else
@@ -678,8 +685,13 @@ start(handles.update_timer);
                     
                     set(handles.htext_Protocol(i), 'String', A(ind_colon(3)+1:ind_semicolon(3)-1));
                     
-                    % fseek(handles.fileID(i),0,'bof');
-                    fprintf(handles.fileID(i),[A(ind_colon(1)-9:ind_semicolon(1)+1) A(ind_colon(2)-7:ind_semicolon(2)-2) '; Protocol:' A(ind_colon(3)+1:ind_semicolon(3)-2) A(end-1:end)]);
+                    if numel(ind_colon) > 3
+                        handles.matObj{i}.trial_time(mRow+1,5) = str2double(A(ind_colon(4)+1));
+                        fprintf(handles.fileID(i),[A(ind_colon(1)-9:ind_semicolon(1)+1) A(ind_colon(2)-7:ind_semicolon(2)-2) '; Protocol:' A(ind_colon(3)+1:ind_semicolon(3)-2) '; early:' A(ind_colon(4)+1) A(end-1:end)]);
+                    else
+                        fprintf(handles.fileID(i),[A(ind_colon(1)-9:ind_semicolon(1)+1) A(ind_colon(2)-7:ind_semicolon(2)-2) '; Protocol:' A(ind_colon(3)+1:ind_semicolon(3)-2) A(end-1:end)]);
+                    end
+                    
                 catch e
                     disp('Serial Callback-Trial');
                     disp(e);
@@ -712,6 +724,7 @@ start(handles.update_timer);
                     handles.matObj{i}.weight(mRow+1,2:121) = double(uint8(A(4:123)));
                 catch e
                     disp('Serial Callback-Weight');
+                    disp(size(A));
                     disp(e);
                 end
                 
@@ -785,6 +798,21 @@ start(handles.update_timer);
                 
                 % update days
                 set(handles.htext_days(i),'String',sprintf('%2.1f days',now - handles.db_table{i}.startDate));
+                
+                % update earlylick
+                try
+                    [mRow,mCol] = size(handles.matObj{i},'trial_time');
+                    if mRow > 100 && mCol > 4
+                        earlylick = handles.matObj{i}.trial_time(mRow-99:mRow,5);
+                        set(handles.htext_earlylick(i),'String',[num2str(sum(earlylick == 1)),'%']);
+                        if earlylick(end) == 2
+                            set(handles.htext_earlylick(i),'String','NaN %');
+                        end
+                    end
+                catch e
+                    disp('Update GUI... earlylick');
+                    disp(e);
+                end
             end
         end
     end
@@ -844,6 +872,8 @@ start(handles.update_timer);
         set(handles.htext_weight1(ind),'BackgroundColor',color);
         set(handles.htext_weight2(ind),'BackgroundColor',color);
         set(handles.htext_g(ind),'BackgroundColor',color);
+        set(handles.htext_early(ind),'BackgroundColor',color);
+        set(handles.htext_earlylick(ind),'BackgroundColor',color);
     end
 
 end
