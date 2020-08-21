@@ -240,8 +240,8 @@ typedef struct {
 typedef struct {
   /////////////////////////////////////////////////
   unsigned int currentTrialNum = 0;          // current trial number
-  int FB_motor_position        = 255;        // Lickport motor Forward/Backward
-  byte FB_final_position       = 0;
+  int FB_motor_position        = 0;        // Lickport motor Forward/Backward
+  byte FB_final_position       = 30;
   byte LR_motor_position       = 70;
   byte ProtocolType            = P_FIXATION;
   byte Autolearn               = 0;          // {"Either", "On", "antiBias", "random","off","fixed"}; 0-5
@@ -289,7 +289,7 @@ byte Min_correct_Right    = 1;
 byte Max_incorrect_Right  = 3;
 byte Min_correct_Left     = 1;
 byte Max_incorrect_Left   = 3;
-byte is_earlylick         = 2; // 0-no earlylick; 1-earlylick; 2-N/A 
+byte is_earlylick         = 2; // 0-no earlylick; 1-earlylick; 2-N/A
 
 float ConsumptionPeriod   = 0.75; //
 float StopLickingPeriod   = 1.0; //
@@ -318,6 +318,7 @@ byte weightByte = 100;
 // others
 RTC_PCF8523         rtc;
 DateTime            now;
+bool sd_card_present  = 1;
 byte LowByte;
 byte SecondByte;
 byte ThirdByte;
@@ -367,63 +368,20 @@ void setup() {
   // Check if SD Card is working...
   if (!SD.begin(chipSelect)) {
     SerialUSB.println("E: SD Card failed, or not present");
-    return; // don't do anything more:
+    sd_card_present = 0;
+    //return; // don't do anything more:
   } else {
     SerialUSB.println("M: SD is working...");
+    sd_card_present = 1;
   }
 
-  // if(button_pressed) a new mouse! {write current (default) parameters S to SD card}
-  // !!!not used in current version!!!
-  if (digitalReadDirect(resetPin) == 0) { // Check if reset button is pressed
-    SerialUSB.println("M: A new Mouse...");
-    write_SD_para_F();
-    write_SD_para_S();
-  } else {                                // otherwise, read parameters from SD Card to override S
-    read_SD_para_F();   // 4 ms
-    read_SD_para_S();
-  }
-
-  //    // change parameters online...
-  //    F.trig_counter  = 663; // Switch triggered counter
-  //    F.headfixation_counter = 2037;
-  //    F.fixation_duration = 30000; // ms
-  //    F.last_advance_headfixation_counter = 0;
-  //    for(int i = 0; i < 20; i++) {
-  //    F.Fixation_Outcome [i] = 1;
-  //    }
-   //     F.struggle_thres_neg = -10;
-   //     F.struggle_thres_pos = 42;
-  //    F.last_advance_threshold_counter = 0;
-  //    F.fixation_interval_max = 30000;
-   //   write_SD_para_F();
-
-  //  S.currentTrialNum         = 4074;       // current trial number
-  //  S.FB_motor_position       = 100;        // Lickport motor Forward/Backward
-  //  S.ProtocolType            = P_DELAY; // P_FIXATION P_SAMPLE P_DELAY P_OPTOSTIM
-  //  S.Autolearn               = 2;          // {"Either", "On", "antiBias", "random","off","fixed"}; 0-5
-  //  S.TrialType               = 2;
-  //  S.random_delay_duration   = 1001;       // ms
-  //  S.Trial_Outcome           = 3;          // 0 error; 1 correct; 2 no response; 3 others
-  //  S.ProtocolHistoryIndex  = 13;          // 0:Fixation; 1-9:Sample; 10-18:Delay
-  //  S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 500;
-  //  S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 100;
-  //  for (int i = RECORD_TRIALS - recent_trials; i < RECORD_TRIALS; i++) {
-  //    S.OutcomeHistory[i] = 1;
-  //  }
-  //  S.struggle_enable = 0;
-  //  S.totoal_reward_num = 1410;
-  //  S.retract_times = 1;
-  // S.SamplePeriod        = 1.20;
-  //  S.DelayPeriod = 0.3;
-  // S.TimeOut       = 3.0;
-  //S.LR_motor_position = 70;
-  //S.FB_final_position = 0;
-  // write_SD_para_S();
+  read_SD_para_F();   // 4 ms
+  read_SD_para_S();
 
   // Check if the RT Clock ready
   if (! rtc.begin()) {
     SerialUSB.println("E: Couldn't find RT Clock");
-    return;
+    //return;
   }
   if (! rtc.initialized()) {
     SerialUSB.println("M: RTC is NOT running! Adjust Time!");
@@ -474,29 +432,8 @@ void setup() {
   scale.tare();  //Reset the scale to 0
   scale.set_scale(calibration_factor);
 
-  // Handshake with Bpod
-  int isHandshake = 0;
-  while (!isHandshake) {
-    Serial1.write('6'); // handshake with Bpod
-    delay(100);
-    while (!Serial1.available()) {
-      SerialUSB.println("E: Trying to handshake with Bpod...");
-      delay(5000);
-      Serial1.write('6');
-      delay(100);
-    }
-    if (Serial1.read() != '5') {
-      // SerialUSB.println("E: handshake failed! Check.");
-      while (Serial1.available()) {
-        Serial1.read();
-      }
-    } else {
-      SerialUSB.println("M: handshake successful.");
-      ledState = HIGH;
-      digitalWrite(ledPin, ledState);
-      isHandshake = 1;
-    }
-  }
+  // Handshake with Bpod; get stuck and keep trying if failed
+  handshake_with_bpod();
 
   Timer4.attachInterrupt(Incase_handler); // in case receiving Bpod data struck
   Timer4.setPeriod(5000000); // Runs  5 sec later to check if get struck
@@ -510,7 +447,7 @@ void setup() {
 void loop() {
 
   // Check if the toggle switch is ON
-  if (digitalReadDirect(switchPin) == 0) { // if yes, run the state matrix
+  if (digitalReadDirect(switchPin) == 0 && sd_card_present == 1) { // if yes, run the state matrix
 
     if (paused == 1) {
       paused = 0;
@@ -526,7 +463,16 @@ void loop() {
       }
 
       // in case SD card was removed and re-insert, need re-initilization
-      SD.begin(chipSelect);
+      if (!SD.begin(chipSelect)) {
+        SerialUSB.println("E: SD Card failed, or not present");
+        sd_card_present = 0;
+        return; // start another loop
+      } else {
+        read_SD_para_F();
+        read_SD_para_S();
+        analogWrite(portMotorLR, S.LR_motor_position);
+        analogWrite(portMotorFB, S.FB_motor_position);
+      }
 
       // free reward to fill the lickport tube
       valve_control(3); //  open valve 1 and 2
@@ -679,7 +625,7 @@ void loop() {
     SwitchR_LastStatus = SwitchR_CurrentStatus;
 
     // detection of release event => free water to lure next fixation
-    if(headfixation_flag == 0 && last_headfixation_flag == 1 && F.fixation_duration < 8000){
+    if (headfixation_flag == 0 && last_headfixation_flag == 1 && F.fixation_duration < 8000) {
       // free reward to fill the lickport tube
       valve_control(3); //  open valve 1 and 2
       delay(40);
@@ -733,6 +679,12 @@ void loop() {
 
       SerialUSB.println("M: Program PAUSED!!!");
       printCurrentTime(); // print current time and date
+    }
+    if (sd_card_present == 0) {
+      if (SD.begin(chipSelect)) {
+        SerialUSB.println("M: SD card inserted");
+        sd_card_present = 1;
+      }
     }
     if (ledState == LOW) {
       ledState = HIGH;
@@ -1058,27 +1010,27 @@ int send_protocol_to_Bpod_and_Run() {
 
         if (random(100) < 15) {  // 10% trials to stim
           int randomNum = random(100);
-//          if (randomNum < 200) {
-//            weightByte = 10;  // percent
-//          } else if (randomNum < 400) {
-//            weightByte = 30;  // percent
-//          } else if (randomNum < 600) {
-//            weightByte = 50;  // percent
-//          } else if (randomNum < 800) {
-//            weightByte = 70;  // percent
-//          } else {
-//            weightByte = 100; // percent
-//          }
+          //          if (randomNum < 200) {
+          //            weightByte = 10;  // percent
+          //          } else if (randomNum < 400) {
+          //            weightByte = 30;  // percent
+          //          } else if (randomNum < 600) {
+          //            weightByte = 50;  // percent
+          //          } else if (randomNum < 800) {
+          //            weightByte = 70;  // percent
+          //          } else {
+          //            weightByte = 100; // percent
+          //          }
           if (randomNum < 33) {
             weightByte = 10;  // percent
-          } else if (randomNum < 67){
+          } else if (randomNum < 67) {
             weightByte = 50; // percent
           } else {
             weightByte = 100; // percent
           }
-          
+
           byte laserByte = 2; // 1-Thorlab; 2-UltraLaser
-          
+
           Serial2.write(weightByte);
           Serial2.write(laserByte);
 
@@ -1910,8 +1862,8 @@ int autoReward() {
     S.GaveFreeReward.flag_R_water = 0;
     S.GaveFreeReward.flag_L_water = 0;
     S.GaveFreeReward.past_trials ++;
-	
-	byte error_trials = 3; // consecutive 4 errors in a paticular trial type
+
+    byte error_trials = 3; // consecutive 4 errors in a paticular trial type
 
     // 2) and, S.GaveFreeReward(:,3)>3
     if (S.GaveFreeReward.past_trials > 3) { // && compare_array_sum(S.ProtocolTypeHistory, S.ProtocolType, 90, RECORD_TRIALS) == 10
@@ -2238,12 +2190,12 @@ void switch_fixation_state() {
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("STRUGGLE_DELAY_1000");
           // stop the trial
-//          if (S.ProtocolHistoryIndex > 0) {
-//            if (protocol_sent == 1) {
-//              protocol_sent = 0;
-//              Serial1.write('X'); // stop Bpod
-//            }
-//          }
+          //          if (S.ProtocolHistoryIndex > 0) {
+          //            if (protocol_sent == 1) {
+          //              protocol_sent = 0;
+          //              Serial1.write('X'); // stop Bpod
+          //            }
+          //          }
           last_state_time = millis();
         } else if (SwitchL_CurrentStatus == 1 || SwitchR_CurrentStatus == 1) {
           // escape
@@ -2279,12 +2231,12 @@ void switch_fixation_state() {
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("ESCAPE_DELAY_1000");
           // stop the trial
-//          if (S.ProtocolHistoryIndex > 0) {
-//            if (protocol_sent == 1) {
-//              protocol_sent = 0;
-//              Serial1.write('X'); // stop Bpod
-//            }
-//          }
+          //          if (S.ProtocolHistoryIndex > 0) {
+          //            if (protocol_sent == 1) {
+          //              protocol_sent = 0;
+          //              Serial1.write('X'); // stop Bpod
+          //            }
+          //          }
           last_state_time = millis();
         } else if (millis() - last_state_time > F.fixation_duration) {
           // timeup
@@ -3189,3 +3141,27 @@ void printCurrentTime() {
   SerialUSB.println();
 }
 
+void handshake_with_bpod() {
+  int isHandshake = 0;
+  while (!isHandshake) {
+    Serial1.write('6'); // handshake with Bpod
+    delay(100);
+    while (!Serial1.available()) {
+      SerialUSB.println("E: Trying to handshake with Bpod...");
+      delay(5000);
+      Serial1.write('6');
+      delay(100);
+    }
+    if (Serial1.read() != '5') {
+      // SerialUSB.println("E: handshake failed! Check.");
+      while (Serial1.available()) {
+        Serial1.read();
+      }
+    } else {
+      SerialUSB.println("M: handshake successful.");
+      ledState = HIGH;
+      digitalWrite(ledPin, ledState);
+      isHandshake = 1;
+    }
+  }
+}
