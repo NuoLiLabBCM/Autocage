@@ -1,6 +1,4 @@
-8/20/2020
-Without SD card, the system is running some sort of statemachine. It should be stationary
-    (this will be fixed in version 1.0 update)
+
 
 
 8/20/2020
@@ -64,4 +62,9 @@ PortIn should be triggered
 
 ====================== Resolved =============================
 (Please move the items above to below once fixed).
+
+8/20/2020
+Without SD card, the system is running some sort of statemachine. It should be stationary
+    (this will be fixed in version 1.0 update)
+	
 
