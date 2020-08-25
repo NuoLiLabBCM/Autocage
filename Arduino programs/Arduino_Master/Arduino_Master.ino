@@ -45,12 +45,12 @@ bool protocol_sent = 0;
 const byte portMotorLR     = 2;  // analog write channel, Left-Right
 const byte portMotorFB     = 3;  // analog write channel, Forward-Backward
 const byte portMotorPole   = 4;  // analog write channel, Motorized Pole
+const byte portSD          = 5;  // SD card detection: low if inserted; high if removed
 const byte portSwitchL     = 22;
 const byte portSwitchR     = 23;
 const byte portWeight_DOUT = 7;  // weight stage data
 const byte portWeight_CLK  = 6;  // weight stage clock
 const byte switchPin       = 49; // ToggerSwitch pin to start/pause experiment
-const byte resetPin        = 51; // PushBoutton pin to start a new mouse: press the button and reset the controller for a new mouse
 const byte ledPin          = 13; // LED pin
 const byte chipSelect      = 10; // Adafruit SD shields and modules: pin 10
 
@@ -267,6 +267,9 @@ typedef struct {
   byte struggle_enable = 1;
   unsigned int totoal_reward_num          = 1;
   byte retract_times = 0;
+
+  float reward_left  = 0.03;
+  float reward_right = 0.03;
   /////////////////////////////////////////////////
 } Parameters_behavior;
 
@@ -281,7 +284,7 @@ byte finalPos = leftPos;
 int LickPortMove         = 0;
 const byte mov_step_size = 5;
 
-float Reward_duration_behavior = 0.028; // sec
+float Reward_duration_behavior = 0.03; // sec
 float AnswerPeriod_behavior    = 4.0;
 byte MaxSame              = 3;
 float NoTrialProb         = 0.5;
@@ -318,7 +321,6 @@ byte weightByte = 100;
 // others
 RTC_PCF8523         rtc;
 DateTime            now;
-bool sd_card_present  = 1;
 byte LowByte;
 byte SecondByte;
 byte ThirdByte;
@@ -350,7 +352,6 @@ void setup() {
   pinMode(ledPin, OUTPUT);
   digitalWriteDirect(ledPin, ledState);
   pinMode(switchPin, INPUT_PULLUP); // low if switch on; hight if switch off
-  pinMode(resetPin, INPUT_PULLUP);  // low if button pressed; hight if boutton released
 
   pinMode(portSwitchL, INPUT_PULLUP);
   SwitchL_LastStatus = digitalReadDirect(portSwitchL);
@@ -365,14 +366,14 @@ void setup() {
   analogWrite(portMotorFB, 5);
   analogWrite(portMotorPole, 5);
 
+  pinMode(portSD, INPUT_PULLUP);
+
   // Check if SD Card is working...
-  if (!SD.begin(chipSelect)) {
-    SerialUSB.println("E: SD Card failed, or not present");
-    sd_card_present = 0;
-    //return; // don't do anything more:
+  if (digitalReadDirect(portSD) == 1) {
+    SerialUSB.println("E: SD Card not inserted...");
   } else {
-    SerialUSB.println("M: SD is working...");
-    sd_card_present = 1;
+    SD.begin(chipSelect);
+    SerialUSB.println("M: SD card detected!");
   }
 
   read_SD_para_F();   // 4 ms
@@ -437,6 +438,12 @@ void setup() {
 
   Timer4.attachInterrupt(Incase_handler); // in case receiving Bpod data struck
   Timer4.setPeriod(5000000); // Runs  5 sec later to check if get struck
+
+  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0) {
+    paused = 0;
+  } else {
+    paused = 1;
+  }
 }
 
 
@@ -446,8 +453,8 @@ void setup() {
 /****************************************************************************************************/
 void loop() {
 
-  // Check if the toggle switch is ON
-  if (digitalReadDirect(switchPin) == 0 && sd_card_present == 1) { // if yes, run the state matrix
+  // if (Rocker_switch is ON && SD card inserted), run the state matrix
+  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0) {
 
     if (paused == 1) {
       paused = 0;
@@ -463,16 +470,11 @@ void loop() {
       }
 
       // in case SD card was removed and re-insert, need re-initilization
-      if (!SD.begin(chipSelect)) {
-        SerialUSB.println("E: SD Card failed, or not present");
-        sd_card_present = 0;
-        return; // start another loop
-      } else {
+        SD.begin(chipSelect);
         read_SD_para_F();
         read_SD_para_S();
         analogWrite(portMotorLR, S.LR_motor_position);
         analogWrite(portMotorFB, S.FB_motor_position);
-      }
 
       // free reward to fill the lickport tube
       valve_control(3); //  open valve 1 and 2
@@ -625,7 +627,7 @@ void loop() {
     SwitchR_LastStatus = SwitchR_CurrentStatus;
 
     // detection of release event => free water to lure next fixation
-    if (headfixation_flag == 0 && last_headfixation_flag == 1 && F.fixation_duration < 8000) {
+    if (headfixation_flag == 0 && last_headfixation_flag == 1 && F.fixation_duration < 15000) {
       // free reward to fill the lickport tube
       valve_control(3); //  open valve 1 and 2
       delay(40);
@@ -679,12 +681,6 @@ void loop() {
 
       SerialUSB.println("M: Program PAUSED!!!");
       printCurrentTime(); // print current time and date
-    }
-    if (sd_card_present == 0) {
-      if (SD.begin(chipSelect)) {
-        SerialUSB.println("M: SD card inserted");
-        sd_card_present = 1;
-      }
     }
     if (ledState == LOW) {
       ledState = HIGH;
@@ -761,8 +757,8 @@ int send_protocol_to_Bpod_and_Run() {
         states[2]  = CreateState("DelayPeriod",       S.DelayPeriod,            1, DelayPeriod_Cond,     0, NoOutput);
         states[3]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     1, ResponseCue_Output);
         states[4]  = CreateState("AnswerPeriod",      3600,                     3, AnswerPeriod_Cond,    0, NoOutput);
-        states[5]  = CreateState("RewardL",           Reward_duration_behavior, 1, RewardL_Cond,         1, RewardL_Output);
-        states[6]  = CreateState("RewardR",           Reward_duration_behavior, 1, RewardR_Cond,         1, RewardR_Output);
+        states[5]  = CreateState("RewardL",           S.reward_left,            1, RewardL_Cond,         1, RewardL_Output);
+        states[6]  = CreateState("RewardR",           S.reward_right,           1, RewardR_Cond,         1, RewardR_Output);
         states[7]  = CreateState("RewardConsumption", ConsumptionPeriod,        1, Tup_EndTrial_Cond,    0, NoOutput); //0.75
         states[8]  = CreateState("NoResponse",        0.002,                    1, Tup_EndTrial_Cond,    0, NoOutput);
         states[9]  = CreateState("TrialEnd",          0.01,                     1, TrialEnd_Cond,        0, NoOutput);
@@ -792,11 +788,13 @@ int send_protocol_to_Bpod_and_Run() {
             LeftLickAction  = "Reward";
             RightLickAction = "TimeOut";
             RewardOutput    = LeftWaterOutput;
+            Reward_duration_behavior = S.reward_left;
             break;
           case 0: // right
             LeftLickAction  = "TimeOut";
             RightLickAction = "Reward";
             RewardOutput    = RightWaterOutput;
+            Reward_duration_behavior = S.reward_right;
             break;
         }
 
@@ -870,11 +868,13 @@ int send_protocol_to_Bpod_and_Run() {
             LeftLickAction  = "Reward";
             RightLickAction = "TimeOut";
             RewardOutput    = LeftWaterOutput;
+            Reward_duration_behavior = S.reward_left;
             break;
           case 0:
             LeftLickAction  = "TimeOut";
             RightLickAction = "Reward";
             RewardOutput    = RightWaterOutput;
+            Reward_duration_behavior = S.reward_right;
             break;
         }
 
@@ -955,11 +955,13 @@ int send_protocol_to_Bpod_and_Run() {
             LeftLickAction  = "Reward";
             RightLickAction = "TimeOut";
             RewardOutput    = LeftWaterOutput;
+            Reward_duration_behavior = S.reward_left;
             break;
           case 0:
             LeftLickAction  = "TimeOut";
             RightLickAction = "Reward";
             RewardOutput    = RightWaterOutput;
+            Reward_duration_behavior = S.reward_right;
             break;
         }
 
@@ -1521,7 +1523,7 @@ int autoChangeProtocol() {
       if (F.fixation_duration > 25000) { // 25 sec
         S.ProtocolType         = P_SAMPLE;
 
-        S.SamplePeriod        = 1.20;
+        S.SamplePeriod        = 1.30;
         S.DelayPeriod         = 0.3;   // in sec
         S.TimeOut             = 1.00;
         S.Autolearn           = 1;    // autoLearn ON
@@ -1539,7 +1541,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.20;
+        S.SamplePeriod        = 1.30;
         S.DelayPeriod         = 0.3;   // in sec
         S.TimeOut             = 1.00;
         S.Autolearn           = 1;    // autoLearn ON
@@ -1564,7 +1566,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.20;
+        S.SamplePeriod        = 1.30;
         S.DelayPeriod         = 0.3;   // in sec
         S.TimeOut             = 2.00;
         S.Autolearn = 2; // antiBias
@@ -1578,7 +1580,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
         S.ProtocolType        = P_DELAY;
-        S.SamplePeriod        = 1.20;  // in sec
+        S.SamplePeriod        = 1.30;  // in sec
         S.DelayPeriod         = 0.3;   // in sec
         S.TimeOut             = 3.0;
         S.Autolearn           = 2;     // antiBias
@@ -1591,7 +1593,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.2;
+        S.SamplePeriod        = 1.3;
         S.TimeOut             = 0.50;
         S.Autolearn           = 2; // antiBias
       }
@@ -1603,7 +1605,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.2;
+        S.SamplePeriod        = 1.3;
         S.TimeOut             = 1.0;
         S.Autolearn           = 2; // antiBias
       }
@@ -1615,7 +1617,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.2;
+        S.SamplePeriod        = 1.3;
         S.TimeOut             = 1.5;
         S.Autolearn           = 2; // antiBias
       }
@@ -1627,7 +1629,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.2;
+        S.SamplePeriod        = 1.3;
         S.TimeOut             = 2.0;
         S.Autolearn           = 2; // antiBias
       }
@@ -1696,7 +1698,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod  = 1.2;   // in sec
+        S.SamplePeriod  = 1.3;   // in sec
         S.DelayPeriod  = 0.5;   // in sec
         S.TimeOut             = 3.0;
         S.Autolearn           = 2; // antiBias
@@ -1709,7 +1711,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod  = 1.2;   // in sec
+        S.SamplePeriod  = 1.3;   // in sec
         S.DelayPeriod  = 0.8;   // in sec
         S.TimeOut             = 3.0;
         S.Autolearn           = 2; // antiBias
@@ -1722,7 +1724,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod  = 1.2;   // in sec
+        S.SamplePeriod  = 1.3;   // in sec
         S.DelayPeriod  = 1.0;   // in sec
         S.TimeOut             = 3.0;
         S.Autolearn           = 2; // antiBias
@@ -1735,7 +1737,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod  = 1.2;   // in sec
+        S.SamplePeriod  = 1.3;   // in sec
         S.DelayPeriod  = 1.3;   // in sec
         S.TimeOut             = 3.0;
         S.Autolearn           = 2; // antiBias
@@ -1748,7 +1750,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod  = 1.2;   // in sec
+        S.SamplePeriod  = 1.3;   // in sec
         S.DelayPeriod   = 1.3;   // in sec
         S.TimeOut             = 4.0;
         S.Autolearn           = 2; // antiBias
@@ -1764,7 +1766,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
         S.ProtocolType  = P_OPTOSTIM;
-        S.SamplePeriod  = 1.2;   // in sec
+        S.SamplePeriod  = 1.3;   // in sec
         S.DelayPeriod   = 1.3;   // in sec
         S.TimeOut       = 4.0;
         S.Autolearn     = 2; // antiBias
@@ -2470,6 +2472,9 @@ int write_SD_para_S() {
     dataFile.write(S.retract_times);
     dataFile.write(S.LR_motor_position);
     dataFile.write(S.FB_final_position);
+
+    //dataFile.write((byte*)&S.reward_left, sizeof(float));
+    //dataFile.write((byte*)&S.reward_right, sizeof(float));
   } else {
     SerialUSB.println("E: error opening paraS.txt");
     return -1;
@@ -2517,6 +2522,9 @@ int read_SD_para_S() {
     S.retract_times = dataFile.read();
     S.LR_motor_position = dataFile.read();
     S.FB_final_position = dataFile.read();
+
+    //dataFile.read((byte*)&S.reward_left, sizeof(float));
+    //dataFile.read((byte*)&S.reward_right, sizeof(float));
   } else {
     SerialUSB.println("E: error opening paraS.txt");
     return -1;

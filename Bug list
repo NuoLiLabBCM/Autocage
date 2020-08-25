@@ -42,20 +42,13 @@ following information:
 
 8/20/2020
 There are a lot of cross talk between the two lickport, particularly when there is water (e.g. touching right port
-triggers a transient <2ms signal in the left). We need to change either the hardware and software to make the lick
-detection more robust.
-1) Hardware change: increase the capacitance of the lickport circuit detecting contact
-2) Software change: We need to change the Arduino_Task on how PortIn is triggered. Currently a transient change 
-will trigger. We need to alter the following portion of the code by adding more than one timestep to the history.
-PortIn should be triggered 
-			// Determine port entry events
-			if ((PortInputLineValue[x] == HIGH) && (PortInputLineLastKnownStatus[x] == LOW)) {
-				PortInputLineLastKnownStatus[x] = HIGH;
-				CurrentEvent[nCurrentEvents] = Ev;
-				nCurrentEvents++;
-			}
-
-
+triggers a transient <2ms signal in the left). 
+	Hardware change required: 
+		1) increase the capacitance of the lickport circuit detecting contact
+		2) make sure trimmer resistors on the lickometer is set to max
+	Documentation change required:
+		1) include testing with oscilloscope into the test document.
+		
 
 
 
