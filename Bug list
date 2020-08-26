@@ -1,4 +1,7 @@
-
+8/20/2020
+Without plugging into GUI, plug in SD card with "final config files". Hit reset, program does not run normally standalone. However, it works
+well when connecting to GUI.
+    Due to noise when power is plugged in, triggering false 'early licks'.
 
 
 8/20/2020
@@ -46,10 +49,6 @@ following information:
 Without SD card, the system is running some sort of statemachine. It should be stationary
     (this will be fixed in version 1.0 update)
 	
-8/20/2020
-Without plugging into GUI, plug in SD card with "final config files". Hit reset, program does not run normally standalone. However, it works
-well when connecting to GUI.
-    Due to noise when power is plugged in, triggering false 'early licks'.
 	
 8/20/2020
 When plugging in SD card, user should hit 'reset', otherwise the system will run previously saved variables,
