@@ -80,6 +80,7 @@ typedef struct {
   // 1-mark arduino restarted
   // 7-switchTriggered; 8-headfixation; 11-headfixation again immediately after release
   // 9-release1:timeup; 10-release2:escape; 12-release3:struggle
+  // 20-user updating parameters from GUI
   int events_value[20]          = {0};
 } Events_fixation;
 
@@ -100,8 +101,8 @@ int motor_retract_step               = 10; // 0-255
 bool is_motor_advance                = 0;
 unsigned int last_advance_reward_num = 0;
 int lick_num_before_motor_retract1   = 10;
-int lick_num_before_motor_retract2   = 20;
-int lick_num_before_motor_retract3   = 30;
+int lick_num_before_motor_retract2   = 15;
+int lick_num_before_motor_retract3   = 20;
 
 boolean headfixation_flag           = 0;
 boolean last_headfixation_flag      = 0;
@@ -250,12 +251,12 @@ typedef struct {
   byte Trial_Outcome           = 3;          // 0 error; 1 correct; 2 no response; 3 others
   /////////////////////////////////////////////////
 
-  float SamplePeriod        = 1.20; //
+  float SamplePeriod        = 1.30; //
   float DelayPeriod         = 0.30; // 0.3->1.3
   float TimeOut             = 0.50; // 0.5->4
 
   byte ProtocolHistoryIndex               = 0;  // index of ProtocolHistory
-  ProtocolHistoryInfo ProtocolHistory[20] = {}; // [protocol#, n_trials on this protocol, performance]
+  ProtocolHistoryInfo ProtocolHistory[30] = {}; // [protocol#, n_trials on this protocol, performance]
 
   RewardFlag GaveFreeReward = {0, 0, 0}; // [flag_R_water  flag_L_water    past trials] 	// keeps track of the number of trials since the last reward
 
@@ -325,6 +326,7 @@ byte LowByte;
 byte SecondByte;
 byte ThirdByte;
 byte ForthByte;
+String buffer_tmp;
 
 
 /****************************************************************************************************/
@@ -483,33 +485,96 @@ void loop() {
     }
 
     if (protocol_sent == 0) {
-      if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > 0) {
+      if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > S.FB_final_position) {
         send_protocol_to_Bpod_and_Run(); //49 ms - 96 ms
       } else if (headfixation_flag == 1) { // need check if head is fixed
         send_protocol_to_Bpod_and_Run();
       }
     }
 
-    // two-byte communication with PC for motor
+    // two-byte communication with PC
     if (SerialUSB.available()) { // receiving data from PC
-      byte CommandByte = SerialUSB.read();  // F for Motor F/B, L for Motor L/R
-      byte   motorByte = SerialUSBReadByte();
+      byte CommandByte = SerialUSB.read();  
+      byte dataByte;
+      String buffer_tmp;
+      // F for Motor FB, 
+      // L for Motor LR,
+      // P for Motor for pole
+      // f for final motor FB position
+      // R for reward size
+      // r for free reward
+      // C for control panel info retrival
+      // T for tare weighting stage
       switch (CommandByte) {
         case 'F':  // Motor F/B; 0-255
-          //S.FB_motor_position = motorByte;
-          //write_SD_para_S();
-          analogWrite(portMotorFB, motorByte);
+          dataByte = SerialUSBReadByte();
+          S.FB_motor_position = dataByte;
+          write_SD_para_S();
+          analogWrite(portMotorFB, dataByte);
           // delay(500);
+          // user change event
+          Ev.events_id[Ev.events_num] = 20; // headfixation release3: struggle
+          Ev.events_time[Ev.events_num] = millis();
+          Ev.events_value[Ev.events_num] = S.FB_motor_position;
+          Ev.events_num ++;
           break;
         case 'L':  // Motor L/R; 0-255; 70 is center
-          S.LR_motor_position = motorByte;
+          dataByte = SerialUSBReadByte();
+          S.LR_motor_position = dataByte;
           write_SD_para_S();
-          analogWrite(portMotorLR, motorByte);
+          analogWrite(portMotorLR, dataByte);
+          // delay(500);
+          // user change event
+          Ev.events_id[Ev.events_num] = 20; // headfixation release3: struggle
+          Ev.events_time[Ev.events_num] = millis();
+          Ev.events_value[Ev.events_num] = S.LR_motor_position;
+          Ev.events_num ++;
+          break;
+        case 'P':  // Motor Pole; 0-255; 30 is anterior, 100 is posterior
+          dataByte = SerialUSBReadByte();
+          analogWrite(portMotorPole, dataByte);
           // delay(500);
           break;
-        case 'P':  // Motor Pole; 0-255; 120 is anterior, 190 is posterior
-          analogWrite(portMotorPole, motorByte);
-          // delay(500);
+        case 'f': // update motor F/B final position
+          dataByte = SerialUSBReadByte();
+          S.FB_final_position = dataByte;
+          write_SD_para_S();
+          // user change event
+          Ev.events_id[Ev.events_num] = 20; // headfixation release3: struggle
+          Ev.events_time[Ev.events_num] = millis();
+          Ev.events_value[Ev.events_num] = S.FB_final_position;
+          Ev.events_num ++;
+          break;
+        case 'R': // updating reward value
+          buffer_tmp = SerialUSB.readStringUntil('\n');
+          S.reward_left = buffer_tmp.toFloat();
+          buffer_tmp = SerialUSB.readStringUntil('\n');
+          S.reward_right = buffer_tmp.toFloat();
+          break;
+        case 'r': // free reward
+          valve_control(3); //  open valve 1 and 2
+          delay(uint((S.reward_left + S.reward_right) / 2 * 1000));
+          valve_control(0); // close valve 1 and 2
+          break;
+        case 'C':
+          SerialUSB.print("C");
+          SerialUSB.print(S.FB_motor_position);
+          SerialUSB.print(";");
+          SerialUSB.print(S.LR_motor_position);
+          SerialUSB.print(";");
+          SerialUSB.print(finalPos);
+          SerialUSB.print(";");
+          SerialUSB.print(S.FB_final_position);
+          SerialUSB.print(";");
+          SerialUSB.print(S.reward_left);
+          SerialUSB.print(";");
+          SerialUSB.print(S.reward_right);
+          SerialUSB.println(";");
+          break;
+        case 'T': //tare the scale to 0
+          scale.set_scale();
+          scale.tare();  //Reset the scale to 0
+          scale.set_scale(calibration_factor);
           break;
         default: // never happen...
           while (SerialUSB.available()) {
@@ -572,9 +637,9 @@ void loop() {
         last_reward_time = millis();
         SerialUSB.println("E: No Reward in Last 12 Hours.");
 
-        if (F.fixation_duration <= 3000 && S.retract_times < 8 && S.FB_motor_position < 50) { // && F.trig_counter < 30
+        if (F.fixation_duration <= 3000 && S.retract_times < 8 && S.FB_motor_position < 50 + S.FB_final_position) { // && F.trig_counter < 30
           // check if move the lickport closer to mouse to lure them in // todo: move back more frequent but retracting faster
-          S.FB_motor_position = 50;
+          S.FB_motor_position = 50 + S.FB_final_position;
           analogWrite(portMotorFB, S.FB_motor_position);
           S.retract_times++;
           SerialUSB.print("E: Motor retracted back NO. ");
@@ -1367,7 +1432,7 @@ void PrintResult2PC() {
   //SerialUSB.print(S.ProtocolHistory[S.ProtocolHistoryIndex].performance);
   //SerialUSB.println("%");
 
-  if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > 0) {
+  if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > S.FB_final_position) {
     SerialUSB.print("M: Motor Pos: ");
     SerialUSB.print(S.FB_motor_position);
     SerialUSB.print("; Trig No.: ");
@@ -1428,7 +1493,7 @@ int autoChangeProtocol() {
   switch (S.ProtocolHistoryIndex) {
     case 0:
       // determine TrialType
-      if (S.FB_motor_position < 50 && S.FB_motor_position > 0) {
+      if (S.FB_motor_position < 60 + S.FB_final_position && S.FB_motor_position > S.FB_final_position) {
         S.Autolearn = 0; // eigher side will be rewarded
       } else {
         S.Autolearn = 1; // 'ON': 3 left, 3 right
@@ -1472,13 +1537,13 @@ int autoChangeProtocol() {
             } */
 
       // determine if advance motor
-      if (S.FB_motor_position > 0) {
-        if (S.FB_motor_position > 150) {
+      if (S.FB_motor_position > S.FB_final_position) {
+        if (S.FB_motor_position > 150 + S.FB_final_position) {
           if (S.totoal_reward_num != last_advance_reward_num && S.totoal_reward_num % lick_num_before_motor_retract1 == 0) {
             is_motor_advance = 1;
             last_advance_reward_num = S.totoal_reward_num;
           }
-        } else if (S.FB_motor_position > 70) {
+        } else if (S.FB_motor_position > 70 + S.FB_final_position) {
           if (S.totoal_reward_num != last_advance_reward_num && S.totoal_reward_num % lick_num_before_motor_retract2 == 0) {
             is_motor_advance = 1;
             last_advance_reward_num = S.totoal_reward_num;
@@ -1501,8 +1566,8 @@ int autoChangeProtocol() {
         if (is_motor_advance == 1) {
           is_motor_advance = 0;
 
-          if (S.FB_motor_position < motor_retract_step) {
-            S.FB_motor_position = 0;
+          if (S.FB_motor_position - S.FB_final_position < motor_retract_step) {
+            S.FB_motor_position = S.FB_final_position;
             analogWrite(portMotorFB, S.FB_motor_position);
           } else {
             for (int j = 0; j < motor_retract_step; j++) {
@@ -1516,7 +1581,9 @@ int autoChangeProtocol() {
           //          Ev.events_value[Ev.events_num] = S.FB_motor_position;
           //          Ev.events_num ++;
           SerialUSB.print("M: Motor advanced to ");
-          SerialUSB.println(S.FB_motor_position);
+          SerialUSB.print(S.FB_motor_position);
+          SerialUSB.print(", final position: ");
+          SerialUSB.println(S.FB_final_position);
         }
       }
 
@@ -2070,7 +2137,7 @@ void switch_fixation_state() {
 
         SerialUSB.print("M: Switch triggered NO. ");
         SerialUSB.println(F.trig_counter);
-        if (F.trig_counter > trigger_num_before_fix && S.FB_motor_position == 0) {
+        if (F.trig_counter > trigger_num_before_fix && S.FB_motor_position <= S.FB_final_position) {
           timer_state = DELAY_TO_FIX;
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("DELAY_TO_FIX");
@@ -2390,17 +2457,28 @@ int write_SD_para_F() {
   File dataFile = SD.open("paraF.txt", O_WRITE);
   if (dataFile) {
     dataFile.seek(0);
-    dataFile.write((byte*)&F.trig_counter, sizeof(int));
-    dataFile.write((byte*)&F.fixation_duration, sizeof(unsigned int));
-    dataFile.write((byte*)&F.last_advance_headfixation_counter, sizeof(int));
+    dataFile.print("trig_counter = ");
+    dataFile.println(F.trig_counter);
+    dataFile.print("fixation_duration = ");
+    dataFile.println(F.fixation_duration);
+    dataFile.print("last_advance_headfixation_counter = ");
+    dataFile.println(F.last_advance_headfixation_counter);
+    dataFile.print("Fixation_Outcome = ");
     for (int i = 0; i < 20; i++) {
-      dataFile.write(F.Fixation_Outcome[i]);
+      dataFile.print(F.Fixation_Outcome[i]);
+      dataFile.print("; ");
     }
-    dataFile.write((byte*)&F.struggle_thres_neg, sizeof(int));
-    dataFile.write((byte*)&F.struggle_thres_pos, sizeof(int));
-    dataFile.write((byte*)&F.last_advance_threshold_counter, sizeof(int));
-    dataFile.write((byte*)&F.headfixation_counter, sizeof(int));
-    dataFile.write((byte*)&F.fixation_interval_max, sizeof(int));
+    dataFile.println();
+    dataFile.print("struggle_thres_neg = ");
+    dataFile.println(F.struggle_thres_neg);
+    dataFile.print("struggle_thres_pos = ");
+    dataFile.println(F.struggle_thres_pos);
+    dataFile.print("last_advance_threshold_counter = ");
+    dataFile.println(F.last_advance_threshold_counter);
+    dataFile.print("headfixation_counter = ");
+    dataFile.println(F.headfixation_counter);
+    dataFile.print("fixation_interval_max = ");
+    dataFile.println(F.fixation_interval_max);
   } else {
     SerialUSB.println("E: error opening paraF.txt");
     return -1;
@@ -2414,17 +2492,38 @@ int read_SD_para_F() {
   File dataFile = SD.open("paraF.txt", O_READ);
   if (dataFile) {
     dataFile.seek(0);
-    dataFile.read((byte*)&F.trig_counter, sizeof(int));
-    dataFile.read((byte*)&F.fixation_duration, sizeof(unsigned int));
-    dataFile.read((byte*)&F.last_advance_headfixation_counter, sizeof(int));
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    F.trig_counter = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    F.fixation_duration = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    F.last_advance_headfixation_counter = buffer_tmp.toInt();
+
+    buffer_tmp = dataFile.readStringUntil('=');
     for (int i = 0; i < 20; i++) {
-      F.Fixation_Outcome[i] = dataFile.read();
+      buffer_tmp = dataFile.readStringUntil(';');
+      F.Fixation_Outcome[i] = buffer_tmp.toInt();
     }
-    dataFile.read((byte*)&F.struggle_thres_neg, sizeof(int));
-    dataFile.read((byte*)&F.struggle_thres_pos, sizeof(int));
-    dataFile.read((byte*)&F.last_advance_threshold_counter, sizeof(int));
-    dataFile.read((byte*)&F.headfixation_counter, sizeof(int));
-    dataFile.read((byte*)&F.fixation_interval_max, sizeof(int));
+    buffer_tmp = dataFile.readStringUntil('\n');
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    F.struggle_thres_neg = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    F.struggle_thres_pos = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    F.last_advance_threshold_counter = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    F.headfixation_counter = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    F.fixation_interval_max = buffer_tmp.toInt();
   } else {
     SerialUSB.println("E: error opening paraF.txt");
     return -1;
@@ -2439,42 +2538,94 @@ int write_SD_para_S() {
   File dataFile = SD.open("paraS.txt", O_WRITE);
   if (dataFile) {
     dataFile.seek(0);
-    dataFile.write((byte*)&S.currentTrialNum, sizeof(unsigned int));
-    dataFile.write((byte*)&S.FB_motor_position, sizeof(int));
-    dataFile.write(S.ProtocolType);
-    dataFile.write(S.Autolearn);
-    dataFile.write(S.TrialType);
-    dataFile.write((byte*)&S.random_delay_duration, sizeof(int));
-    dataFile.write(S.Trial_Outcome);
+    dataFile.print("currentTrialNum = ");
+    dataFile.println(S.currentTrialNum);
+    dataFile.print("FB_motor_position = ");
+    dataFile.println(S.FB_motor_position);
+    dataFile.print("ProtocolType = ");
+    dataFile.println(S.ProtocolType);
+    dataFile.print("Autolearn = ");
+    dataFile.println(S.Autolearn);
+    dataFile.print("TrialType = ");
+    dataFile.println(S.TrialType);
+    dataFile.print("random_delay_duration = ");
+    dataFile.println(S.random_delay_duration);
+    dataFile.print("Trial_Outcome = ");
+    dataFile.println(S.Trial_Outcome);
 
-    dataFile.write((byte*)&S.SamplePeriod, sizeof(float));
-    dataFile.write((byte*)&S.DelayPeriod, sizeof(float));
-    dataFile.write((byte*)&S.TimeOut, sizeof(float));
-    dataFile.write(S.ProtocolHistoryIndex);
-    for (int i = 0; i < 20; i++) {
-      dataFile.write(S.ProtocolHistory[i].Protocol);
-      dataFile.write((byte*)&S.ProtocolHistory[i].nTrials, sizeof(unsigned int));
-      dataFile.write(S.ProtocolHistory[i].performance);
+    dataFile.print("SamplePeriod = ");
+    dataFile.println(S.SamplePeriod);
+    dataFile.print("DelayPeriod = ");
+    dataFile.println(S.DelayPeriod);
+    dataFile.print("TimeOut = ");
+    dataFile.println(S.TimeOut);
+    dataFile.print("ProtocolHistoryIndex = ");
+    dataFile.println(S.ProtocolHistoryIndex);
+
+    dataFile.print("ProtocolHistory.Protocol = ");
+    for (int i = 0; i < 30; i++) {
+      dataFile.print(S.ProtocolHistory[i].Protocol);
+      dataFile.print("; ");
     }
+    dataFile.println();
 
-    dataFile.write(S.GaveFreeReward.flag_R_water);
-    dataFile.write(S.GaveFreeReward.flag_L_water);
-    dataFile.write((byte*)&S.GaveFreeReward.past_trials, sizeof(unsigned int));
+    dataFile.print("ProtocolHistory.nTrials = ");
+    for (int i = 0; i < 30; i++) {
+      dataFile.print(S.ProtocolHistory[i].nTrials);
+      dataFile.print("; ");
+    }
+    dataFile.println();
 
+    dataFile.print("ProtocolHistory.performance = ");
+    for (int i = 0; i < 30; i++) {
+      dataFile.print(S.ProtocolHistory[i].performance);
+      dataFile.print("; ");
+    }
+    dataFile.println();
+
+    dataFile.print("GaveFreeReward.flag_R_water = ");
+    dataFile.println(S.GaveFreeReward.flag_R_water);
+    dataFile.print("GaveFreeReward.flag_L_water = ");
+    dataFile.println(S.GaveFreeReward.flag_L_water);
+    dataFile.print("GaveFreeReward.past_trials = ");
+    dataFile.println(S.GaveFreeReward.past_trials);
+
+    dataFile.print("ProtocolTypeHistory = ");
     for (int i = 0; i < RECORD_TRIALS; i++) {
-      dataFile.write(S.ProtocolTypeHistory[i]);
-      dataFile.write(S.TrialTypeHistory[i]);
-      dataFile.write(S.OutcomeHistory[i]);
+      dataFile.print(S.ProtocolTypeHistory[i]);
+      dataFile.print("; ");
     }
+    dataFile.println();
 
-    dataFile.write(S.struggle_enable);
-    dataFile.write((byte*)&S.totoal_reward_num, sizeof(unsigned int));
-    dataFile.write(S.retract_times);
-    dataFile.write(S.LR_motor_position);
-    dataFile.write(S.FB_final_position);
+    dataFile.print("TrialTypeHistory = ");
+    for (int i = 0; i < RECORD_TRIALS; i++) {
+      dataFile.print(S.TrialTypeHistory[i]);
+      dataFile.print("; ");
+    }
+    dataFile.println();
 
-    //dataFile.write((byte*)&S.reward_left, sizeof(float));
-    //dataFile.write((byte*)&S.reward_right, sizeof(float));
+    dataFile.print("OutcomeHistory = ");
+    for (int i = 0; i < RECORD_TRIALS; i++) {
+      dataFile.print(S.OutcomeHistory[i]);
+      dataFile.print("; ");
+    }
+    dataFile.println();
+
+    dataFile.print("struggle_enable = ");
+    dataFile.println(S.struggle_enable);
+    dataFile.print("totoal_reward_num = ");
+    dataFile.println(S.totoal_reward_num);
+    dataFile.print("retract_times = ");
+    dataFile.println(S.retract_times);
+    dataFile.print("LR_motor_position = ");
+    dataFile.println(S.LR_motor_position);
+    dataFile.print("FB_final_position = ");
+    dataFile.println(S.FB_final_position);
+
+    dataFile.print("reward_left = ");
+    dataFile.println(S.reward_left);
+    dataFile.print("reward_right = ");
+    dataFile.println(S.reward_right);
   } else {
     SerialUSB.println("E: error opening paraS.txt");
     return -1;
@@ -2489,42 +2640,119 @@ int read_SD_para_S() {
   File dataFile = SD.open("paraS.txt", O_READ);
   if (dataFile) {
     dataFile.seek(0);
-    dataFile.read((byte*)&S.currentTrialNum, sizeof(unsigned int));
-    dataFile.read((byte*)&S.FB_motor_position, sizeof(int));
-    S.ProtocolType = dataFile.read();
-    S.Autolearn = dataFile.read();
-    S.TrialType = dataFile.read();
-    dataFile.read((byte*)&S.random_delay_duration, sizeof(int));
-    S.Trial_Outcome = dataFile.read();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.currentTrialNum = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.FB_motor_position = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.ProtocolType = buffer_tmp.toInt();
 
-    dataFile.read((byte*)&S.SamplePeriod, sizeof(float));
-    dataFile.read((byte*)&S.DelayPeriod, sizeof(float));
-    dataFile.read((byte*)&S.TimeOut, sizeof(float));
-    S.ProtocolHistoryIndex = dataFile.read();
-    for (int i = 0; i < 20; i++) {
-      S.ProtocolHistory[i].Protocol = dataFile.read();
-      dataFile.read((byte*)&S.ProtocolHistory[i].nTrials, sizeof(unsigned int));
-      S.ProtocolHistory[i].performance = dataFile.read();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.Autolearn = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.TrialType = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.random_delay_duration = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.Trial_Outcome = buffer_tmp.toInt();
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.SamplePeriod = buffer_tmp.toFloat();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.DelayPeriod = buffer_tmp.toFloat();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.TimeOut = buffer_tmp.toFloat();
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.ProtocolHistoryIndex = buffer_tmp.toInt();
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    for (int i = 0; i < 30; i++) {
+      buffer_tmp = dataFile.readStringUntil(';');
+      S.ProtocolHistory[i].Protocol = buffer_tmp.toInt();
     }
+    buffer_tmp = dataFile.readStringUntil('\n');
 
-    S.GaveFreeReward.flag_R_water = dataFile.read();
-    S.GaveFreeReward.flag_L_water = dataFile.read();
-    dataFile.read((byte*)&S.GaveFreeReward.past_trials, sizeof(unsigned int));
+    buffer_tmp = dataFile.readStringUntil('=');
+    for (int i = 0; i < 30; i++) {
+      buffer_tmp = dataFile.readStringUntil(';');
+      S.ProtocolHistory[i].nTrials = buffer_tmp.toInt();
+    }
+    buffer_tmp = dataFile.readStringUntil('\n');
 
+    buffer_tmp = dataFile.readStringUntil('=');
+    for (int i = 0; i < 30; i++) {
+      buffer_tmp = dataFile.readStringUntil(';');
+      S.ProtocolHistory[i].performance = buffer_tmp.toInt();
+    }
+    buffer_tmp = dataFile.readStringUntil('\n');
+
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.GaveFreeReward.flag_R_water = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.GaveFreeReward.flag_L_water = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.GaveFreeReward.past_trials = buffer_tmp.toInt();
+
+    buffer_tmp = dataFile.readStringUntil('=');
     for (int i = 0; i < RECORD_TRIALS; i++) {
-      S.ProtocolTypeHistory[i] = dataFile.read();
-      S.TrialTypeHistory[i] = dataFile.read();
-      S.OutcomeHistory[i] = dataFile.read();
+      buffer_tmp = dataFile.readStringUntil(';');
+      S.ProtocolTypeHistory[i] = buffer_tmp.toInt();
     }
+    buffer_tmp = dataFile.readStringUntil('\n');
 
-    S.struggle_enable = dataFile.read();
-    dataFile.read((byte*)&S.totoal_reward_num, sizeof(unsigned int));
-    S.retract_times = dataFile.read();
-    S.LR_motor_position = dataFile.read();
-    S.FB_final_position = dataFile.read();
+    buffer_tmp = dataFile.readStringUntil('=');
+    for (int i = 0; i < RECORD_TRIALS; i++) {
+      buffer_tmp = dataFile.readStringUntil(';');
+      S.TrialTypeHistory[i] = buffer_tmp.toInt();
+    }
+    buffer_tmp = dataFile.readStringUntil('\n');
 
-    //dataFile.read((byte*)&S.reward_left, sizeof(float));
-    //dataFile.read((byte*)&S.reward_right, sizeof(float));
+    buffer_tmp = dataFile.readStringUntil('=');
+    for (int i = 0; i < RECORD_TRIALS; i++) {
+      buffer_tmp = dataFile.readStringUntil(';');
+      S.OutcomeHistory[i] = buffer_tmp.toInt();
+    }
+    buffer_tmp = dataFile.readStringUntil('\n');
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.struggle_enable = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.totoal_reward_num = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.retract_times = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.LR_motor_position = buffer_tmp.toInt();
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.FB_final_position = buffer_tmp.toInt();
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.reward_left = buffer_tmp.toFloat();
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.reward_right = buffer_tmp.toFloat();
   } else {
     SerialUSB.println("E: error opening paraS.txt");
     return -1;
@@ -2582,7 +2810,7 @@ int write_SD_trial_info() {
     dataFile.print(" ");
     dataFile.print(trial_stim_index);
 
-    // print F/B and L/R motor position todo... FB_motor_position
+    // print F/B and L/R motor position
     dataFile.print(" ");
     dataFile.print(S.FB_motor_position);
     dataFile.print(" ");
