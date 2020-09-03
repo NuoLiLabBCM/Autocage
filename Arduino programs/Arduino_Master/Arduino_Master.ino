@@ -1076,7 +1076,7 @@ int send_protocol_to_Bpod_and_Run() {
         states[0]  = CreateState("TrigTrialStart",    0.1,                      1, TrigTrialStart_Cond,  1, TrigTrialStart_Output);
 
         if (random(100) < 15) {  // 10% trials to stim
-          int randomNum = random(100);
+          int randomNum = random(300);
           //          if (randomNum < 200) {
           //            weightByte = 10;  // percent
           //          } else if (randomNum < 400) {
@@ -1088,9 +1088,9 @@ int send_protocol_to_Bpod_and_Run() {
           //          } else {
           //            weightByte = 100; // percent
           //          }
-          if (randomNum < 33) {
+          if (randomNum < 100) {
             weightByte = 10;  // percent
-          } else if (randomNum < 67) {
+          } else if (randomNum < 200) {
             weightByte = 50; // percent
           } else {
             weightByte = 100; // percent
@@ -1102,7 +1102,7 @@ int send_protocol_to_Bpod_and_Run() {
           Serial2.write(laserByte);
 
           randomNum = random(300);
-          if (randomNum < 151) { // 1/3 sample
+          if (randomNum < 100) { // 1/3 sample
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    2, Sample_Pole_Stim_Output);
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 2, Sample_Pole_Stim_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
@@ -1113,7 +1113,7 @@ int send_protocol_to_Bpod_and_Run() {
             states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    0, NoOutput);
             // mark this trial as stim trial...sample
             trial_stim_index = weightByte + 1; // 11, 31, 51, 71, 101
-          } else if (randomNum < 301) {// 1/3 delay
+          } else if (randomNum < 200) {// 1/3 delay
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     1, OptoStim_Output);
@@ -1138,6 +1138,8 @@ int send_protocol_to_Bpod_and_Run() {
           }
         }
         else { // Control trial
+          Serial2.write(byte(0));
+          Serial2.write(byte(2));
           states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
           states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
           states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
