@@ -525,7 +525,7 @@ void loop() {
           analogWrite(portMotorLR, dataByte);
           // delay(500);
           // user change event
-          Ev.events_id[Ev.events_num] = 20; // headfixation release3: struggle
+          Ev.events_id[Ev.events_num] = 21; // headfixation release3: struggle
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = S.LR_motor_position;
           Ev.events_num ++;
@@ -540,7 +540,7 @@ void loop() {
           S.FB_final_position = dataByte;
           write_SD_para_S();
           // user change event
-          Ev.events_id[Ev.events_num] = 20; // headfixation release3: struggle
+          Ev.events_id[Ev.events_num] = 22; // headfixation release3: struggle
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = S.FB_final_position;
           Ev.events_num ++;
@@ -550,11 +550,14 @@ void loop() {
           S.reward_left = buffer_tmp.toFloat();
           buffer_tmp = SerialUSB.readStringUntil('\n');
           S.reward_right = buffer_tmp.toFloat();
-          break;
-        case 'r': // free reward
-          valve_control(3); //  open valve 1 and 2
-          delay(uint((S.reward_left + S.reward_right) / 2 * 1000));
-          valve_control(0); // close valve 1 and 2
+          write_SD_para_S();
+          
+          valve_control(1); //  open valve 1 
+          delay(uint(S.reward_left * 1000));
+          valve_control(0); // close valve 1
+          valve_control(2); //  open valve 2
+          delay(uint(S.reward_right * 1000));
+          valve_control(0); // close valve 2
           break;
         case 'C':
           SerialUSB.print("C");
@@ -562,19 +565,32 @@ void loop() {
           SerialUSB.print(";");
           SerialUSB.print(S.LR_motor_position);
           SerialUSB.print(";");
-          SerialUSB.print(finalPos);
+          SerialUSB.print(finalPos); // pole motor position
           SerialUSB.print(";");
           SerialUSB.print(S.FB_final_position);
           SerialUSB.print(";");
           SerialUSB.print(S.reward_left);
           SerialUSB.print(";");
           SerialUSB.print(S.reward_right);
+          SerialUSB.print(";");
+          SerialUSB.print(scale.get_units()); // weight
+          SerialUSB.print(";");
+          SerialUSB.print(F.struggle_thres_neg);
+          SerialUSB.print(";");
+          SerialUSB.print(F.struggle_thres_pos);
           SerialUSB.println(";");
           break;
         case 'T': //tare the scale to 0
           scale.set_scale();
           scale.tare();  //Reset the scale to 0
           scale.set_scale(calibration_factor);
+          break;
+        case 'S': //set Struggle threshold
+          buffer_tmp = SerialUSB.readStringUntil('\n');
+          F.struggle_thres_neg = buffer_tmp.toInt();
+          buffer_tmp = SerialUSB.readStringUntil('\n');
+          F.struggle_thres_pos = buffer_tmp.toInt();
+          write_SD_para_F();
           break;
         default: // never happen...
           while (SerialUSB.available()) {
