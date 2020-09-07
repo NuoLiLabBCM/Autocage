@@ -1,0 +1,34 @@
+Hardware:
+1.	Power up Arduino_Master with 12V adapter; V
+2.	Label different Arduino with correct name; V
+3.	Use two-position toggle switch for flush and label flush side with ‘Flush’; V
+4.	Change the position of FB motor according to the default value we set (e.g., 30, instead of 0 as before) 
+
+
+Arduino_Master:
+1.	If SD card is not presented, pause the system; V
+2.	Add module to send last-24-hour data from SD card; X (not feasible, needs tens of seconds)
+3.	Read parameter files every time Rocker switch ON, so that when changing a SD card, reset is not necessary; V
+4.	Additional parameter for final position for FB motor, and will be updated by GUI; V
+5.	Change parameter files into human-readable text file (instead of a binary file); V
+6.	Separate reward size for left and right, and add mechanism for receiving reward size info from GUI; V
+7.	Record events for user updating parameters from GUI; V
+
+
+Matlab GUI:
+1.	Read last-24-hour data from SD card every time ‘open’ a COM port; and erase data once the COM port is closed; X (not feasible, needs tens of seconds)
+2.	Add additional panel for updating reward size on Arduino (and also add a ‘reward’ button); V
+3.	Add ‘read’ button for the motor position and automatically update motor position when a cage is selected; “move” BF final position. V
+4.	Periodically check COM port, if not available, disconnect it (or event based?). V(every second)
+5.	Add ‘tare’ weighting stage button; read threshold values; read the weight; V
+
+
+Documentation:
+1.	Input/output table for the cage;
+2.	Including pictures with pins/boards labeled;
+3.	Including folder path when talking about files
+4.	Add ‘how to upload Arduino program’
+5.	Create a ‘test’ folder for all files used only for test;
+6.	Explain state machine is coded in Arduino_Task;
+7.	Add instructions for first-time use, daily maintain, changing SD card, changing mouse, pull data from SD card;
+8.	Explain datafiles in SD card and provide example script to read these files;

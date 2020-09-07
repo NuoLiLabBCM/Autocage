@@ -1,4 +1,4 @@
-function varargout = homecage_gui(varargin)
+function homecage_gui(varargin)
 % HOMECAGE_GUI shows graphic user interfaces of the automatic homecages
 %
 %      Current Cage Number: 
@@ -10,7 +10,7 @@ function varargout = homecage_gui(varargin)
 %
 %
 %       Created on         09/15/2018   by Y.H.
-%       Last modified on   01/18/2019   by Y.H.
+%       Last modified on   09/06/2020   by Y.H.
 
 %% GUI preparation
 handles.total_cage_num = 30;
@@ -59,13 +59,23 @@ for cage_i = 1:handles.total_cage_num
         'Position',[pos(cage_i,1)+0.057,pos(cage_i,2)+0.16,0.03,0.015]); % 'ButtonDownFcn',@text_days_Buttondown,...
     
     % Popup for chosing COM port
+    if isempty(serialportlist)
     handles.hpopup(cage_i) = uicontrol('Style','popupmenu',...
-        'String',[{'Chose a port'} ; serialPorts.SerialPorts],...
+        'String',[{'Chose a port'}],... % 
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@popup_com_Callback,...
         'ButtonDownFcn',@popup_com_Buttondown,...
         'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.102,0.032,0.03],...
         'TooltipString', 'Right-click to update COM list');
+    else
+        handles.hpopup(cage_i) = uicontrol('Style','popupmenu',...
+        'String',[{'Chose a port'} ; serialPorts.SerialPorts],... % serialPorts.SerialPorts
+        'Units', 'normalized',        'Tag', num2str(cage_i),...
+        'Callback',@popup_com_Callback,...
+        'ButtonDownFcn',@popup_com_Buttondown,...
+        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.102,0.032,0.03],...
+        'TooltipString', 'Right-click to update COM list');
+    end
     handles.hbutton_open(cage_i) = uicontrol('Style','pushbutton','String','open',...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@button_open_Callback,...
@@ -160,7 +170,7 @@ handles.htext_protocolInfo = uicontrol('Style','text',...
                          '10-18: Delay Protocol (18: final)',...
                          '19: Start to Optical Stimulation'},...
     'Units', 'normalized',        'Tag', 'text_errorMsg',...
-    'Position',[0.01,0.67,0.1,0.2]);
+    'Position',[0.01,0.77,0.1,0.2]);
 
 
 % listbox for error message
@@ -184,51 +194,115 @@ colormap(handles.mymap);
 colorbar('Ticks',0.0625:0.125:1,'TickLabels',{'80','160','240','320','400','480','560 (24hr)','640 Trials'},...
     'Position',[0.72, 0.11, 0.01, 0.16]);
 
-% motor panel
-handles.hpanel = uipanel('Title','Motor Control',...
-    'Position',[.765 .11 .09 .17]);
+% control panel
+handles.hpanel = uipanel('Title','Control Panel',...
+    'Position',[.005 .5 .12 .35]);
 % Popup for chosing Which Cage
 handles.htext_whichCage = uicontrol('Style','text','String','Cage: ',...
     'Units', 'normalized',        'Tag', 'text_whichcage',...
-    'Position',[0.78,0.225,0.02,0.02]);
+    'Position',[0.01,0.805,0.02,0.02]);
 handles.hpopup_Cage = uicontrol('Style','popupmenu',...
-    'String',[{'Chose a Cage'} ; 1:30],...
+    'String',[{'Chose a Cage'} ; 1:handles.total_cage_num],...
     'Units', 'normalized',        'Tag', 'popup_whichcage',...
-    'Position',[0.80,0.23,0.035,0.02],...
+    'Position',[0.03,0.81,0.04,0.02],...
+    'Callback',{@button_moveSet,'Read'},...
     'TooltipString', 'Which Cage to Control');
+handles.hbutton_readParas = uicontrol('Style','pushbutton','String','Read',...
+    'Units', 'normalized',        'Tag', 'button_read',...
+    'Callback',{@button_moveSet,'Read'},...
+    'Position',[0.075,0.805,0.04,0.025]);
 % motor FB
 handles.htext_motorFB = uicontrol('Style','text','String','MotorFB',...
     'Units', 'normalized',        'Tag', 'text_motorFB',...
-    'Position',[0.77,0.185,0.03,0.02]);
+    'Position',[0.01,0.765,0.03,0.02]);
 handles.hedit_motorFB = uicontrol('Style','edit','String','0',...
     'Units', 'normalized',        'Tag', 'edit_motorFB',...
-    'Position',[0.80,0.19,0.025,0.02]);
-handles.hbutton_motorFB = uicontrol('Style','pushbutton','String','Move',...
+    'Position',[0.04,0.77,0.025,0.02]);
+handles.hbutton_motorFB = uicontrol('Style','pushbutton','String','Move & Set',...
     'Units', 'normalized',        'Tag', 'button_motorFB',...
-    'Callback',{@button_moveMotor,'FB'},...
-    'Position',[0.83,0.19,0.02,0.02]);
+    'Callback',{@button_moveSet,'FB'},...
+    'Position',[0.07,0.77,0.04,0.02]);
 % motor LR
-handles.htext_motorLR = uicontrol('Style','text','String','motorLR',...
+handles.htext_motorLR = uicontrol('Style','text','String','MotorLR',...
     'Units', 'normalized',        'Tag', 'text_motorLR',...
-    'Position',[0.77,0.155,0.03,0.02]);
-handles.hedit_motorLR = uicontrol('Style','edit','String','70',...
+    'Position',[0.01,0.74,0.03,0.02]);
+handles.hedit_motorLR = uicontrol('Style','edit','String','0',...
     'Units', 'normalized',        'Tag', 'edit_motorLR',...
-    'Position',[0.80,0.16,0.025,0.02]);
-handles.hbutton_motorLR = uicontrol('Style','pushbutton','String','Move',...
+    'Position',[0.04,0.745,0.025,0.02]);
+handles.hbutton_motorLR = uicontrol('Style','pushbutton','String','Move & Set',...
     'Units', 'normalized',        'Tag', 'button_motorLR',...
-    'Callback',{@button_moveMotor,'LR'},...
-    'Position',[0.83,0.16,0.02,0.02]);
+    'Callback',{@button_moveSet,'LR'},...
+    'Position',[0.07,0.745,0.04,0.02]);
 % motor Pole
-handles.htext_motorPole = uicontrol('Style','text','String','motorPole',...
+handles.htext_motorPole = uicontrol('Style','text','String','MotorPole',...
     'Units', 'normalized',        'Tag', 'text_motorPole',...
-    'Position',[0.77,0.125,0.03,0.02]);
-handles.hedit_motorPole = uicontrol('Style','edit','String','30',...
+    'Position',[0.01,0.715,0.03,0.02]);
+handles.hedit_motorPole = uicontrol('Style','edit','String','0',...
     'Units', 'normalized',        'Tag', 'edit_motorPole',...
-    'Position',[0.80,0.13,0.025,0.02]);
+    'Position',[0.04,0.72,0.025,0.02]);
 handles.hbutton_motorPole = uicontrol('Style','pushbutton','String','Move',...
     'Units', 'normalized',        'Tag', 'button_motorPole',...
-    'Callback',{@button_moveMotor,'Pole'},...
-    'Position',[0.83,0.13,0.02,0.02]);
+    'Callback',{@button_moveSet,'Pole'},...
+    'Position',[0.07,0.72,0.04,0.02]);
+% motor FB final
+handles.htext_finalFB = uicontrol('Style','text','String','FinalFB',...
+    'Units', 'normalized',        'Tag', 'text_finalFB',...
+    'Position',[0.01,0.69,0.03,0.02]);
+handles.hedit_finalFB = uicontrol('Style','edit','String','0',...
+    'Units', 'normalized',        'Tag', 'edit_finalFB',...
+    'Position',[0.04,0.695,0.025,0.02]);
+handles.hbutton_finalFB = uicontrol('Style','pushbutton','String','Set',...
+    'Units', 'normalized',        'Tag', 'button_finalFB',...
+    'Callback',{@button_moveSet,'Final'},...
+    'Position',[0.07,0.695,0.04,0.02]);
+
+% Reward left right
+handles.htext_rewardLeft = uicontrol('Style','text','String','Left (s)',...
+    'Units', 'normalized',        'Tag', 'text_rewardLeft',...
+    'Position',[0.01,0.66,0.03,0.02]);
+handles.hedit_rewardLeft = uicontrol('Style','edit','String','0.03',...
+    'Units', 'normalized',        'Tag', 'edit_rewardLeft',...
+    'Position',[0.04,0.665,0.025,0.02]);
+handles.htext_rewardRight = uicontrol('Style','text','String','Right (s)',...
+    'Units', 'normalized',        'Tag', 'text_rewardRight',...
+    'Position',[0.01,0.635,0.03,0.02]);
+handles.hedit_rewardRight = uicontrol('Style','edit','String','0.03',...
+    'Units', 'normalized',        'Tag', 'edit_rewardRight',...
+    'Position',[0.04,0.64,0.025,0.02]);
+
+handles.hbutton_reward = uicontrol('Style','pushbutton','String','Set&Reward',...
+    'Units', 'normalized',        'Tag', 'button_reward',...
+    'Callback',{@button_moveSet,'Reward'},...
+    'Position',[0.07,0.6525,0.04,0.02]);
+
+% weight
+handles.htext_tare = uicontrol('Style','text','String','Weight (s)',...
+    'Units', 'normalized',        'Tag', 'text_tare',...
+    'Position',[0.01,0.605,0.03,0.02]);
+handles.hedit_tare = uicontrol('Style','edit','String','0',...
+    'Units', 'normalized',        'Tag', 'edit_tare',...
+    'Position',[0.04,0.61,0.025,0.02]);
+handles.hbutton_tare = uicontrol('Style','pushbutton','String','Tare',...
+    'Units', 'normalized',        'Tag', 'button_tare',...
+    'Callback',{@button_moveSet,'Tare'},...
+    'Position',[0.07,0.61,0.04,0.02]);
+
+% Struggle threshold H and L
+handles.htext_struggleH = uicontrol('Style','text','String','Struggle Thres (g)',...
+    'Units', 'normalized',        'Tag', 'text_struggleH',...
+    'Position',[0.01,0.55,0.032,0.04]);
+handles.hedit_struggleH = uicontrol('Style','edit','String','36',...
+    'Units', 'normalized',        'Tag', 'edit_struggleH',...
+    'Position',[0.04,0.58,0.025,0.02]);
+
+handles.hedit_struggleL = uicontrol('Style','edit','String','-1',...
+    'Units', 'normalized',        'Tag', 'edit_struggleL',...
+    'Position',[0.04,0.555,0.025,0.02]);
+
+handles.hbutton_struggleSet = uicontrol('Style','pushbutton','String','Set',...
+    'Units', 'normalized',        'Tag', 'button_struggleSet',...
+    'Callback',{@button_moveSet,'Struggle'},...
+    'Position',[0.07,0.5675,0.04,0.02]);
 
 
 
@@ -243,10 +317,15 @@ handles.hbutton_loadParas = uicontrol('Style','pushbutton','String','Load Paras'
     'Position',[0.86,0.16,0.04,0.03]);
 
 % Create Timer to update GUI (background color and weight) periodically
-TimerInteval = 600;       % Default timer interval (1 min)
+TimerInteval = 600;       % Default timer interval (10 min)
 handles.update_timer = timer('Name','MainTimer','TimerFcn',{@updateGUI},...
     'Period',TimerInteval,'ExecutionMode','fixedRate');
 start(handles.update_timer);
+
+SerialTimerInterval = 1;
+handles.serial_update_timer = timer('Name','SeiralTimer','TimerFcn',{@serialTimer},...
+    'Period',SerialTimerInterval,'ExecutionMode','fixedRate');
+start(handles.serial_update_timer);
 %% Callback Functions
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%% Callback Functions %%%%%%%%%%%%%%%%%%
@@ -327,6 +406,7 @@ start(handles.update_timer);
                     disp('error in Open Serial Port...');
                     disp(e);
                     msgbox('Serial port open failed.');
+                    return;
                 end
                 set(source,'String','close');
                 % open MSG.txt file to write
@@ -445,113 +525,124 @@ start(handles.update_timer);
 
 % Plot buttons
     function button_plotPW_Callback(source,eventdata)
-        figure,
-        % plot trial history data in last 24 hr
-        subplot(3,1,1),hold on,
         Cage_num = str2double(get(source,'Tag'));
-        [mRow,~] = size(handles.matObj{Cage_num},'trial_time'); % trial num, datetime,trial type, outcome
-        trialData = handles.matObj{Cage_num}.trial_time(1:mRow,1:4);
-        trialData_time = trialData(:,2);
-        current_time = now;
-        [trialData_time_24,~] = find(trialData_time>current_time-1);
-        if ~isempty(trialData_time_24)
-            num_trial_24hr = numel(trialData_time_24);
-            for i = trialData_time_24(1):mRow
-                % 'Others'-3 || Reward-1 || No Response-0 || Time Out (error)-2
-                switch trialData(i,4)
-                    case 0
-                        plot(trialData(i,2),trialData(i,3),'bo');
-                    case 1
-                        plot(trialData(i,2),trialData(i,3),'g.','markersize',25);
-                    otherwise
-                        plot(trialData(i,2),trialData(i,3),'r.','markersize',25);
+        if strcmp(get(handles.hbutton_open(Cage_num),'String'), 'open')
+            msgbox(['The COM port of Cage ', num2str(Cage_num), ' is CLOSED!']);
+            return;
+        else
+            figure,
+            % plot trial history data in last 24 hr
+            subplot(3,1,1),hold on,
+            
+            [mRow,~] = size(handles.matObj{Cage_num},'trial_time'); % trial num, datetime,trial type, outcome
+            trialData = handles.matObj{Cage_num}.trial_time(1:mRow,1:4);
+            trialData_time = trialData(:,2);
+            current_time = now;
+            [trialData_time_24,~] = find(trialData_time>current_time-1);
+            if ~isempty(trialData_time_24)
+                num_trial_24hr = numel(trialData_time_24);
+                for i = trialData_time_24(1):mRow
+                    % 'Others'-3 || Reward-1 || No Response-0 || Time Out (error)-2
+                    switch trialData(i,4)
+                        case 0
+                            plot(trialData(i,2),trialData(i,3),'bo');
+                        case 1
+                            plot(trialData(i,2),trialData(i,3),'g.','markersize',25);
+                        otherwise
+                            plot(trialData(i,2),trialData(i,3),'r.','markersize',25);
+                    end
                 end
+                xlim([current_time-1 current_time]); ylim([-0.5 1.5]);
+                set(gca,'ytick',[0 1],'yticklabel',{'Right','Left'});
+                set(gca,'xtick',[current_time-1 current_time-0.75 current_time-0.5 current_time-0.25 current_time],'xticklabel',{'0','6','12','18','24'});
+                title([num2str(num_trial_24hr), ' trials in last 24-hour']);
             end
-            xlim([current_time-1 current_time]); ylim([-0.5 1.5]);
-            set(gca,'ytick',[0 1],'yticklabel',{'Right','Left'});
-            set(gca,'xtick',[current_time-1 current_time-0.75 current_time-0.5 current_time-0.25 current_time],'xticklabel',{'0','6','12','18','24'});
-            title([num2str(num_trial_24hr), ' trials in last 24-hour']);
-        end
-        
-        % plot weight data in last 48 hours
-        subplot(3,1,2),hold on,
-        [mRow,~] = size(handles.matObj{Cage_num},'weight');
-        weight_date = handles.matObj{Cage_num}.weight(1:mRow,1);
-        [weight_date_24,~] = find(weight_date>current_time-1);
-        [weight_date_48,~] = find(weight_date>current_time-2);
-        [weight_date_72,~] = find(weight_date>current_time-3);
-        if ~isempty(weight_date_24)
-            weight = handles.matObj{Cage_num}.weight(weight_date_24(1):mRow,1:121);
-            [mRow2,~] = size(weight);
-            weight_data = zeros(30,mRow2);
-            for i = 1:mRow2
-                weight_data(:,i) = typecast(uint8(weight(i,2:121)), 'single')';
-            end
-            plot(weight(:,1),mean(weight_data),'k.');
-            %
-            %             sample_ind = 20:20:mRow2;
-            %             weight_data_avg = zeros(numel(sample_ind),1);
-            %             for i = 1:numel(sample_ind)
-            %                 weight_data_tmp = weight_data(:,sample_ind(i)-19:sample_ind(i));
-            %                 [N,edges] = histcounts(weight_data_tmp(:),20);
-            %                 max_weight = edges(N==max(N));
-            %                 weight_data_avg(i) = max_weight(1);
-            %             end
-            %             plot(weight(20:20:mRow2,1),weight_data_avg,'linewidth',3);
-            %
-            [N,edges] = histcounts(weight_data(:),100);
-            ind = find(N==max(N));
-            weight_24 = edges(ind(1));
-        end
-        if ~isempty(weight_date_48)
-            weight = handles.matObj{Cage_num}.weight(weight_date_48(1):weight_date_24(1),1:121);
-            [mRow2,~] = size(weight);
-            if mRow2 > 1
+            
+            % plot weight data in last 48 hours
+            subplot(3,1,2),hold on,
+            [mRow,~] = size(handles.matObj{Cage_num},'weight');
+            weight_date = handles.matObj{Cage_num}.weight(1:mRow,1);
+            [weight_date_24,~] = find(weight_date>current_time-1);
+            [weight_date_48,~] = find(weight_date>current_time-2);
+            [weight_date_72,~] = find(weight_date>current_time-3);
+            if ~isempty(weight_date_24)
+                weight = handles.matObj{Cage_num}.weight(weight_date_24(1):mRow,1:121);
+                [mRow2,~] = size(weight);
                 weight_data = zeros(30,mRow2);
                 for i = 1:mRow2
                     weight_data(:,i) = typecast(uint8(weight(i,2:121)), 'single')';
                 end
+                plot(weight(:,1),mean(weight_data),'k.');
+                %
+                %             sample_ind = 20:20:mRow2;
+                %             weight_data_avg = zeros(numel(sample_ind),1);
+                %             for i = 1:numel(sample_ind)
+                %                 weight_data_tmp = weight_data(:,sample_ind(i)-19:sample_ind(i));
+                %                 [N,edges] = histcounts(weight_data_tmp(:),20);
+                %                 max_weight = edges(N==max(N));
+                %                 weight_data_avg(i) = max_weight(1);
+                %             end
+                %             plot(weight(20:20:mRow2,1),weight_data_avg,'linewidth',3);
+                %
                 [N,edges] = histcounts(weight_data(:),100);
                 ind = find(N==max(N));
-                weight_48 = edges(ind(1));
-            else
-                weight_48 = NaN;
+                weight_24 = edges(ind(1));
             end
-        end
-        if ~isempty(weight_date_72)
-            weight = handles.matObj{Cage_num}.weight(weight_date_72(1):weight_date_48(1),1:121);
-            [mRow2,~] = size(weight);
-            if mRow2 > 1
-                weight_data = zeros(30,mRow2);
-                for i = 1:mRow2
-                    weight_data(:,i) = typecast(uint8(weight(i,2:121)), 'single')';
+            if ~isempty(weight_date_48)
+                weight = handles.matObj{Cage_num}.weight(weight_date_48(1):weight_date_24(1),1:121);
+                [mRow2,~] = size(weight);
+                if mRow2 > 1
+                    weight_data = zeros(30,mRow2);
+                    for i = 1:mRow2
+                        weight_data(:,i) = typecast(uint8(weight(i,2:121)), 'single')';
+                    end
+                    [N,edges] = histcounts(weight_data(:),100);
+                    ind = find(N==max(N));
+                    weight_48 = edges(ind(1));
+                else
+                    weight_48 = NaN;
                 end
-                [N,edges] = histcounts(weight_data(:),100);
-                ind = find(N==max(N));
-                weight_72 = edges(ind(1));
-            else
-                weight_72 = NaN;
             end
+            if ~isempty(weight_date_72)
+                weight = handles.matObj{Cage_num}.weight(weight_date_72(1):weight_date_48(1),1:121);
+                [mRow2,~] = size(weight);
+                if mRow2 > 1
+                    weight_data = zeros(30,mRow2);
+                    for i = 1:mRow2
+                        weight_data(:,i) = typecast(uint8(weight(i,2:121)), 'single')';
+                    end
+                    [N,edges] = histcounts(weight_data(:),100);
+                    ind = find(N==max(N));
+                    weight_72 = edges(ind(1));
+                else
+                    weight_72 = NaN;
+                end
+            end
+            title(['Avg. ', num2str(weight_24), ' g in 24-hr (48-hr: ', num2str(weight_48),' g, 72-hr: ',num2str(weight_72), ' g)']);
+            xlim([current_time-1 current_time]);
+            ylabel('weight (g)'); xlabel('Time (hour)'); ylim([15 30]);
+            set(gca,'xtick',[current_time-1 current_time-22/24 current_time-20/24 current_time-18/24 current_time-16/24 ...
+                current_time-14/24 current_time-12/24 current_time-10/24 current_time-8/24 current_time-6/24 ...
+                current_time-4/24 current_time-2/24 current_time],...
+                'xticklabel',{'0','2','4','6','8','10','12','14','16','18','20','22','24'});
         end
-        title(['Avg. ', num2str(weight_24), ' g in 24-hr (48-hr: ', num2str(weight_48),' g, 72-hr: ',num2str(weight_72), ' g)']);
-        xlim([current_time-1 current_time]);
-        ylabel('weight (g)'); xlabel('Time (hour)'); ylim([15 30]);
-        set(gca,'xtick',[current_time-1 current_time-22/24 current_time-20/24 current_time-18/24 current_time-16/24 ...
-            current_time-14/24 current_time-12/24 current_time-10/24 current_time-8/24 current_time-6/24 ...
-            current_time-4/24 current_time-2/24 current_time],...
-            'xticklabel',{'0','2','4','6','8','10','12','14','16','18','20','22','24'});
     end
 
 % Open Message txt file
     function button_msg_Callback(source,eventdata)
         % Display mesh plot of the currently selected data.
         Cage_num = get(source,'Tag');
-        Mice = get(handles.hedit_mice(str2double(Cage_num)),'String');
-        eval(['!notepad ','./Data/Cage',Cage_num,'/',Mice,'/msg.txt &']); % return immediately with '&'
+        if strcmp(get(handles.hbutton_open(str2double(Cage_num)),'String'), 'open')
+            msgbox(['The COM port of Cage ', Cage_num, ' is CLOSED!']);
+            return;
+        else
+            Mice = get(handles.hedit_mice(str2double(Cage_num)),'String');
+            eval(['!notepad ','./Data/Cage',Cage_num,'/',Mice,'/msg.txt &']); % return immediately with '&'
+        end
     end
 
 % move Motor button callback
-    function button_moveMotor(hObject, eventdata, arg)
+    function button_moveSet(hObject, eventdata, arg)
         value = get(handles.hpopup_Cage,'Value');
         str = get(handles.hpopup_Cage,'String');
         if strcmp(str{value},'Chose a Cage')
@@ -565,17 +656,56 @@ start(handles.update_timer);
             return;
         end
         switch arg
+            case 'Read'
+                fwrite(handles.s{Cage_num},'C'); % Command
             case 'FB'
-                fwrite(handles.s{Cage_num},'F'); % Command
-                fwrite(handles.s{Cage_num},uint8(str2double(get(handles.hedit_motorFB,'String')))); % Value
+                if str2double(get(handles.hedit_motorFB,'String')) > 100
+                    selection = questdlg('Make sure the lickports are higher than the headport floor!',...
+                        'Warning',...
+                        'Yes','No','No');
+                    switch selection
+                        case 'Yes'
+                            fwrite(handles.s{Cage_num},'F'); % Command
+                            fwrite(handles.s{Cage_num},uint8(str2double(get(handles.hedit_motorFB,'String')))); % Value
+                        case 'No'
+                            return;
+                    end
+                else
+                    fwrite(handles.s{Cage_num},'F'); % Command
+                    fwrite(handles.s{Cage_num},uint8(str2double(get(handles.hedit_motorFB,'String')))); % Value
+                end
             case 'LR'
                 fwrite(handles.s{Cage_num},'L'); % Command
                 fwrite(handles.s{Cage_num},uint8(str2double(get(handles.hedit_motorLR,'String')))); % Value
             case 'Pole'
                 fwrite(handles.s{Cage_num},'P'); % Command
                 fwrite(handles.s{Cage_num},uint8(str2double(get(handles.hedit_motorPole,'String')))); % Value
+            case 'Final'
+                fwrite(handles.s{Cage_num},'f'); % Command
+                fwrite(handles.s{Cage_num},uint8(str2double(get(handles.hedit_finalFB,'String')))); % Value
+                msgbox('Done!');
+            case 'Reward'
+                fwrite(handles.s{Cage_num},'P'); % Command
+                fprintf(handles.s{Cage_num},get(handles.hedit_rewardLeft,'String'));
+                fprintf(handles.s{Cage_num},get(handles.hedit_rewardRight,'String'));
+            case 'Tare'
+                selection = questdlg('Make sure the mouse in not on the plateform!',...
+                    'Warning',...
+                    'Yes','No','No');
+                switch selection
+                    case 'Yes'
+                        fwrite(handles.s{Cage_num},'T'); % Command
+                        msgbox('Done!');
+                    case 'No'
+                        return;
+                end
+            case 'Struggle' 
+                fwrite(handles.s{Cage_num},'S'); % Command
+                fprintf(handles.s{Cage_num},get(handles.hedit_struggleL,'String'));
+                fprintf(handles.s{Cage_num},get(handles.hedit_struggleH,'String'));
+                msgbox('Done!');
             otherwise
-                
+                disp('no this command - button_moveSet');
         end
     end
 
@@ -662,14 +792,14 @@ start(handles.update_timer);
         % determine which serial port and which cage
         obj_name = get(obj, 'Name'); % 'Serial-COM7'
         com_port = obj_name(8:end);
-        for i = 1:handles.total_cage_num
-            if strcmp(get(handles.hbutton_open(i),'String'), 'close') && strcmp(handles.db_table{i}.COM,com_port)
+        for i_cage = 1:handles.total_cage_num
+            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close') && strcmp(handles.db_table{i_cage}.COM,com_port)
                 break;
             end
         end
-        % i will be the Cage Num
+        % i_cage will be the Cage Num
         
-        % read data and store in Cage i folder
+        % read data and store in Cage i_cage folder
         A = fscanf(obj);
         switch A(1)
             case 'T' % trial number  perf 100   protocol-trialNum-perf30k
@@ -677,19 +807,19 @@ start(handles.update_timer);
                     ind_colon = find(A == ':');
                     ind_semicolon = find(A == ';');
                     
-                    [mRow,~] = size(handles.matObj{i},'trial_time');
-                    handles.matObj{i}.trial_time(mRow+1,1:2) = [str2double(A(ind_colon(1)+1:ind_semicolon(1)-1)), now];
-                    set(handles.htext_trailNum(i), 'String', A(ind_colon(1)+1:ind_semicolon(1)-1), 'Fontsize', 8+(3*mod(str2double(A(ind_colon(1)+1:ind_semicolon(1)-1)),2)));
+                    [mRow,~] = size(handles.matObj{i_cage},'trial_time');
+                    handles.matObj{i_cage}.trial_time(mRow+1,1:2) = [str2double(A(ind_colon(1)+1:ind_semicolon(1)-1)), now];
+                    set(handles.htext_trailNum(i_cage), 'String', A(ind_colon(1)+1:ind_semicolon(1)-1), 'Fontsize', 8+(3*mod(str2double(A(ind_colon(1)+1:ind_semicolon(1)-1)),2)));
                     
-                    set(handles.htext_perf100(i), 'String', A(ind_colon(2)+1:ind_semicolon(2)-1));
+                    set(handles.htext_perf100(i_cage), 'String', A(ind_colon(2)+1:ind_semicolon(2)-1));
                     
-                    set(handles.htext_Protocol(i), 'String', A(ind_colon(3)+1:ind_semicolon(3)-1));
+                    set(handles.htext_Protocol(i_cage), 'String', A(ind_colon(3)+1:ind_semicolon(3)-1));
                     
                     if numel(ind_colon) > 3
-                        handles.matObj{i}.trial_time(mRow+1,5) = str2double(A(ind_colon(4)+1));
-                        fprintf(handles.fileID(i),[A(ind_colon(1)-9:ind_semicolon(1)+1) A(ind_colon(2)-7:ind_semicolon(2)-2) '; Protocol:' A(ind_colon(3)+1:ind_semicolon(3)-2) '; early:' A(ind_colon(4)+1) A(end-1:end)]);
+                        handles.matObj{i_cage}.trial_time(mRow+1,5) = str2double(A(ind_colon(4)+1));
+                        fprintf(handles.fileID(i_cage),[A(ind_colon(1)-9:ind_semicolon(1)+1) A(ind_colon(2)-7:ind_semicolon(2)-2) '; Protocol:' A(ind_colon(3)+1:ind_semicolon(3)-2) '; early:' A(ind_colon(4)+1) A(end-1:end)]);
                     else
-                        fprintf(handles.fileID(i),[A(ind_colon(1)-9:ind_semicolon(1)+1) A(ind_colon(2)-7:ind_semicolon(2)-2) '; Protocol:' A(ind_colon(3)+1:ind_semicolon(3)-2) A(end-1:end)]);
+                        fprintf(handles.fileID(i_cage),[A(ind_colon(1)-9:ind_semicolon(1)+1) A(ind_colon(2)-7:ind_semicolon(2)-2) '; Protocol:' A(ind_colon(3)+1:ind_semicolon(3)-2) A(end-1:end)]);
                     end
                     
                 catch e
@@ -707,11 +837,11 @@ start(handles.update_timer);
                     else
                         trial_type = 1;
                     end
-                    [mRow,~] = size(handles.matObj{i},'trial_time');
-                    handles.matObj{i}.trial_time(mRow,3:4) = [trial_type, str2double(A(ind_colon(3)+1))];
+                    [mRow,~] = size(handles.matObj{i_cage},'trial_time');
+                    handles.matObj{i_cage}.trial_time(mRow,3:4) = [trial_type, str2double(A(ind_colon(3)+1))];
                     
-                    % fseek(handles.fileID(i),0,'bof');
-                    fprintf(handles.fileID(i),A);
+                    % fseek(handles.fileID(i_cage),0,'bof');
+                    fprintf(handles.fileID(i_cage),A);
                 catch e
                     disp('Serial Callback-Protocol');
                     disp(e);
@@ -719,9 +849,9 @@ start(handles.update_timer);
                 
             case 'W' % weight
                 try
-                    [mRow, ~] = size(handles.matObj{i},'weight');
-                    handles.matObj{i}.weight(mRow+1,1) = now;
-                    handles.matObj{i}.weight(mRow+1,2:121) = double(uint8(A(4:123)));
+                    [mRow, ~] = size(handles.matObj{i_cage},'weight');
+                    handles.matObj{i_cage}.weight(mRow+1,1) = now;
+                    handles.matObj{i_cage}.weight(mRow+1,2:121) = double(uint8(A(4:123)));
                 catch e
                     disp('Serial Callback-Weight');
                     disp(size(A));
@@ -732,56 +862,95 @@ start(handles.update_timer);
                 try
                     existingItems = get(handles.hlistbox, 'String');    % get current listbox list
                     n_items = length(existingItems);
-                    existingItems{n_items+1} = ['Cage ',num2str(i),': ',A(4:end-2),' (',datestr(now),')'];
+                    existingItems{n_items+1} = ['Cage ',num2str(i_cage),': ',A(4:end-2),' (',datestr(now),')'];
                     set(handles.hlistbox, 'String', existingItems);
                     set(handles.hlistbox, 'Value', n_items+1);
-                    fprintf(handles.fileID(i),A(4:end));
+                    fprintf(handles.fileID(i_cage),A(4:end));
                 catch e
                     disp('Serial Callback-Error');
                     disp(e);
                 end
                 
+            case 'C' % control panel info
+                try
+                    ind_semicolon = find(A == ';');
+                    set(handles.hedit_motorFB, 'String', A(2:ind_semicolon(1)-1));
+                    set(handles.hedit_motorLR, 'String', A(ind_semicolon(1)+1:ind_semicolon(2)-1));
+                    set(handles.hedit_motorPole, 'String', A(ind_semicolon(2)+1:ind_semicolon(3)-1));
+                    set(handles.hedit_finalFB, 'String', A(ind_semicolon(3)+1:ind_semicolon(4)-1));
+                    set(handles.hedit_rewardLeft, 'String', A(ind_semicolon(4)+1:ind_semicolon(5)-1));
+                    set(handles.hedit_rewardRight, 'String', A(ind_semicolon(5)+1:ind_semicolon(6)-1));
+                    set(handles.hedit_tare, 'String', A(ind_semicolon(6)+1:ind_semicolon(7)-1));
+                    set(handles.hedit_struggleL, 'String', A(ind_semicolon(7)+1:ind_semicolon(8)-1));
+                    set(handles.hedit_struggleH, 'String', A(ind_semicolon(8)+1:ind_semicolon(9)-1));
+                catch e
+                    disp('Serial Callback - Control panel info');
+                    disp(e);
+                end
+                
             otherwise
-                % fseek(handles.fileID(i),0,'bof');
-                fprintf(handles.fileID(i),A(4:end));
+                % fseek(handles.fileID(i_cage),0,'bof');
+                fprintf(handles.fileID(i_cage),A(4:end));
         end
     end
 %% Timer Callback (Update GUI)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%  Timer Callback (Update GUI)   %%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    function serialTimer(hObject, eventdata)
+        serialPorts = instrhwinfo('serial');
+        for i_cage = 1:handles.total_cage_num
+            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close')
+                % check serial port status
+                if ~ismember(handles.s{i_cage}.port, serialPorts.SerialPorts)
+                    % if not avaible, close
+                    try
+                        fclose(handles.fileID(i_cage));
+                        fclose(handles.s{i_cage});
+                        delete(handles.s{i_cage});
+                    catch e
+                        disp('Close a Serial Port - Seiral Timer ...');
+                        disp(e);
+                    end
+                    set(source,'String','open');
+                    set_background_color(Cage_num,handles.default_color); % set default background color
+                end
+            end
+        end
+    end
+
     function updateGUI(hObject, eventdata)
-        for i = 1:handles.total_cage_num
-            if strcmp(get(handles.hbutton_open(i),'String'), 'close')
+        for i_cage = 1:handles.total_cage_num
+            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close')
                 % update background color
                 try
-                    [mRow,~] = size(handles.matObj{i},'trial_time');
-                    trialData = handles.matObj{i}.trial_time(1:mRow,1:4);
+                    [mRow,~] = size(handles.matObj{i_cage},'trial_time');
+                    trialData = handles.matObj{i_cage}.trial_time(1:mRow,1:4);
                     
                     trialData_time = trialData(:,2);
                     current_time = now;
                     [trialData_time_24,~] = find(trialData_time>current_time-1);
                     if ~isempty(trialData_time_24)
                         num_trial_24hr = numel(trialData_time_24);
-                        set(handles.htext_trailNum24hr(i),'String',[num2str(num_trial_24hr),' (24hr)']);
+                        set(handles.htext_trailNum24hr(i_cage),'String',[num2str(num_trial_24hr),' (24hr)']);
                         if num_trial_24hr > 640
                             num_trial_24hr = 640;
                         end
-                        set_background_color(i,handles.mymap(ceil(num_trial_24hr/80),:));
+                        set_background_color(i_cage,handles.mymap(ceil(num_trial_24hr/80),:));
                     end
                 catch e
                     disp('Update GUI... trial num in 24 hr');
                     disp(e);
-                    set_background_color(i,handles.mymap(1,:));
+                    set_background_color(i_cage,handles.mymap(1,:));
                 end
                 
                 % update weight
                 try
-                    [mRow,~] = size(handles.matObj{i},'weight');
+                    [mRow,~] = size(handles.matObj{i_cage},'weight');
                     if mRow > 200 % 300 sec data
-                        weight_data = handles.matObj{i}.weight(mRow-200:mRow,2:121);
+                        weight_data = handles.matObj{i_cage}.weight(mRow-200:mRow,2:121);
                     else
-                        weight_data = handles.matObj{i}.weight(1:mRow,2:121);
+                        weight_data = handles.matObj{i_cage}.weight(1:mRow,2:121);
                     end
                     [mRow2, ~] = size(weight_data); % 120 mCol
                     weight_data2 = zeros(mRow2, 30);
@@ -790,23 +959,23 @@ start(handles.update_timer);
                     end
                     [N,edges] = histcounts(weight_data2(:),50);
                     ind = find(N==max(N));
-                    set(handles.htext_weight2(i), 'String', num2str(edges(ind(1))));
+                    set(handles.htext_weight2(i_cage), 'String', num2str(edges(ind(1))));
                 catch e
                     disp('Update GUI... weight');
                     disp(e);
                 end
                 
                 % update days
-                set(handles.htext_days(i),'String',sprintf('%2.1f days',now - handles.db_table{i}.startDate));
+                set(handles.htext_days(i_cage),'String',sprintf('%2.1f days',now - handles.db_table{i_cage}.startDate));
                 
                 % update earlylick
                 try
-                    [mRow,mCol] = size(handles.matObj{i},'trial_time');
+                    [mRow,mCol] = size(handles.matObj{i_cage},'trial_time');
                     if mRow > 100 && mCol > 4
-                        earlylick = handles.matObj{i}.trial_time(mRow-99:mRow,5);
-                        set(handles.htext_earlylick(i),'String',[num2str(sum(earlylick == 1)),'%']);
+                        earlylick = handles.matObj{i_cage}.trial_time(mRow-99:mRow,5);
+                        set(handles.htext_earlylick(i_cage),'String',[num2str(sum(earlylick == 1)),'%']);
                         if earlylick(end) == 2
-                            set(handles.htext_earlylick(i),'String','NaN %');
+                            set(handles.htext_earlylick(i_cage),'String','NaN %');
                         end
                     end
                 catch e
@@ -828,19 +997,24 @@ start(handles.update_timer);
         switch selection
             case 'Yes'
                 disp('HomeCage GUI window closing...');
-                stop(handles.update_timer); % stop timely update
-                for i = 1:handles.total_cage_num
-                    if strcmp(get(handles.hbutton_open(i),'String'), 'close')
-                        try
-                            fclose(handles.fileID(i)); % close file object
-                            fclose(handles.s{i});      % close serial port
-                            delete(handles.s{i});
-                        catch e
-                            disp(e);
+                try
+                    stop(handles.update_timer); % stop timely update
+                    for i_cage = 1:handles.total_cage_num
+                        if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close')
+                            try
+                                fclose(handles.fileID(i_cage)); % close file object
+                                fclose(handles.s{i_cage});      % close serial port
+                                delete(handles.s{i_cage});
+                            catch e
+                                disp(e);
+                            end
                         end
                     end
+                    delete(hObject);
+                catch e
+                    disp(e);
+                    delete(hObject);
                 end
-                delete(hObject);
             case 'No'
                 return
         end
