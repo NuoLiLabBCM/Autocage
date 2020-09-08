@@ -509,6 +509,9 @@ void loop() {
         case 'F':  // Motor F/B; 0-255
           dataByte = SerialUSBReadByte();
           S.FB_motor_position = dataByte;
+          if (F.trig_counter > trigger_num_before_fix){
+            S.FB_final_position = S.FB_motor_position;
+          }
           write_SD_para_S();
           analogWrite(portMotorFB, dataByte);
           // delay(500);
