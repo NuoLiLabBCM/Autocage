@@ -472,11 +472,11 @@ void loop() {
       }
 
       // in case SD card was removed and re-insert, need re-initilization
-        SD.begin(chipSelect);
-        read_SD_para_F();
-        read_SD_para_S();
-        analogWrite(portMotorLR, S.LR_motor_position);
-        analogWrite(portMotorFB, S.FB_motor_position);
+      SD.begin(chipSelect);
+      read_SD_para_F();
+      read_SD_para_S();
+      analogWrite(portMotorLR, S.LR_motor_position);
+      analogWrite(portMotorFB, S.FB_motor_position);
 
       // free reward to fill the lickport tube
       valve_control(3); //  open valve 1 and 2
@@ -489,125 +489,6 @@ void loop() {
         send_protocol_to_Bpod_and_Run(); //49 ms - 96 ms
       } else if (headfixation_flag == 1) { // need check if head is fixed
         send_protocol_to_Bpod_and_Run();
-      }
-    }
-
-    // two-byte communication with PC
-    if (SerialUSB.available()) { // receiving data from PC
-      byte CommandByte = SerialUSB.read();  
-      byte dataByte;
-      String buffer_tmp;
-      // F for Motor FB, 
-      // L for Motor LR,
-      // P for Motor for pole
-      // f for final motor FB position
-      // R for reward size
-      // r for free reward
-      // C for control panel info retrival
-      // T for tare weighting stage
-      switch (CommandByte) {
-        case 'F':  // Motor F/B; 0-255
-          dataByte = SerialUSBReadByte();
-          S.FB_motor_position = dataByte;
-          if (F.trig_counter > trigger_num_before_fix){
-            S.FB_final_position = S.FB_motor_position;
-          }
-          write_SD_para_S();
-          analogWrite(portMotorFB, dataByte);
-          // delay(500);
-          // user change event
-          Ev.events_id[Ev.events_num] = 20; // user change event: portMotorFB
-          Ev.events_time[Ev.events_num] = millis();
-          Ev.events_value[Ev.events_num] = S.FB_motor_position;
-          Ev.events_num ++;
-          break;
-        case 'L':  // Motor L/R; 0-255; 70 is center
-          dataByte = SerialUSBReadByte();
-          S.LR_motor_position = dataByte;
-          write_SD_para_S();
-          analogWrite(portMotorLR, dataByte);
-          // delay(500);
-          // user change event
-          Ev.events_id[Ev.events_num] = 21; // user change event: portMotorLR
-          Ev.events_time[Ev.events_num] = millis();
-          Ev.events_value[Ev.events_num] = S.LR_motor_position;
-          Ev.events_num ++;
-          break;
-        case 'P':  // Motor Pole; 0-255; 30 is anterior, 100 is posterior
-          dataByte = SerialUSBReadByte();
-          analogWrite(portMotorPole, dataByte);
-          // delay(500);
-          break;
-        case 'f': // update motor F/B final position
-          dataByte = SerialUSBReadByte();
-          S.FB_final_position = dataByte;
-
-          if (F.trig_counter > trigger_num_before_fix){
-            S.FB_motor_position = S.FB_final_position;
-            analogWrite(portMotorFB, S.FB_motor_position);
-          }
-          
-          write_SD_para_S();
-          
-          // user change event
-          Ev.events_id[Ev.events_num] = 22; // user change event: portMotorFB_final
-          Ev.events_time[Ev.events_num] = millis();
-          Ev.events_value[Ev.events_num] = S.FB_final_position;
-          Ev.events_num ++;
-
-          break;
-        case 'R': // updating reward value
-          buffer_tmp = SerialUSB.readStringUntil('\n');
-          S.reward_left = buffer_tmp.toFloat();
-          buffer_tmp = SerialUSB.readStringUntil('\n');
-          S.reward_right = buffer_tmp.toFloat();
-          write_SD_para_S();
-          
-          valve_control(1); //  open valve 1 
-          delay(uint(S.reward_left * 1000));
-          valve_control(0); // close valve 1
-          valve_control(2); //  open valve 2
-          delay(uint(S.reward_right * 1000));
-          valve_control(0); // close valve 2
-          break;
-        case 'C':
-          SerialUSB.print("C");
-          SerialUSB.print(S.FB_motor_position);
-          SerialUSB.print(";");
-          SerialUSB.print(S.LR_motor_position);
-          SerialUSB.print(";");
-          SerialUSB.print(finalPos); // pole motor position
-          SerialUSB.print(";");
-          SerialUSB.print(S.FB_final_position);
-          SerialUSB.print(";");
-          SerialUSB.print(S.reward_left);
-          SerialUSB.print(";");
-          SerialUSB.print(S.reward_right);
-          SerialUSB.print(";");
-          SerialUSB.print(scale.get_units()); // weight
-          SerialUSB.print(";");
-          SerialUSB.print(F.struggle_thres_neg);
-          SerialUSB.print(";");
-          SerialUSB.print(F.struggle_thres_pos);
-          SerialUSB.println(";");
-          break;
-        case 'T': //tare the scale to 0
-          scale.set_scale();
-          scale.tare();  //Reset the scale to 0
-          scale.set_scale(calibration_factor);
-          break;
-        case 'S': //set Struggle threshold
-          buffer_tmp = SerialUSB.readStringUntil('\n');
-          F.struggle_thres_neg = buffer_tmp.toInt();
-          buffer_tmp = SerialUSB.readStringUntil('\n');
-          F.struggle_thres_pos = buffer_tmp.toInt();
-          write_SD_para_F();
-          break;
-        default: // never happen...
-          while (SerialUSB.available()) {
-            SerialUSB.read();
-          }
-          break;
       }
     }
 
@@ -739,9 +620,7 @@ void loop() {
       Ev.events_num = 0;
     }
 
-  }
-  else
-  { // if the toggle switch is off
+  }  else  { // if the toggle switch is off
     if (paused == 0) {
       paused = 1; // execute only one time
       Timer4.stop();
@@ -781,6 +660,125 @@ void loop() {
     }
     digitalWriteDirect(ledPin, ledState);
     delay(500);
+  }
+
+  // two-byte communication with PC
+  if (SerialUSB.available()) { // receiving data from PC
+    byte CommandByte = SerialUSB.read();
+    byte dataByte;
+    String buffer_tmp;
+    // F for Motor FB,
+    // L for Motor LR,
+    // P for Motor for pole
+    // f for final motor FB position
+    // R for reward size
+    // r for free reward
+    // C for control panel info retrival
+    // T for tare weighting stage
+    switch (CommandByte) {
+      case 'F':  // Motor F/B; 0-255
+        dataByte = SerialUSBReadByte();
+        S.FB_motor_position = dataByte;
+        if (F.trig_counter > trigger_num_before_fix) {
+          S.FB_final_position = S.FB_motor_position;
+        }
+        write_SD_para_S();
+        analogWrite(portMotorFB, dataByte);
+        // delay(500);
+        // user change event
+        Ev.events_id[Ev.events_num] = 20; // user change event: portMotorFB
+        Ev.events_time[Ev.events_num] = millis();
+        Ev.events_value[Ev.events_num] = S.FB_motor_position;
+        Ev.events_num ++;
+        break;
+      case 'L':  // Motor L/R; 0-255; 70 is center
+        dataByte = SerialUSBReadByte();
+        S.LR_motor_position = dataByte;
+        write_SD_para_S();
+        analogWrite(portMotorLR, dataByte);
+        // delay(500);
+        // user change event
+        Ev.events_id[Ev.events_num] = 21; // user change event: portMotorLR
+        Ev.events_time[Ev.events_num] = millis();
+        Ev.events_value[Ev.events_num] = S.LR_motor_position;
+        Ev.events_num ++;
+        break;
+      case 'P':  // Motor Pole; 0-255; 30 is anterior, 100 is posterior
+        dataByte = SerialUSBReadByte();
+        analogWrite(portMotorPole, dataByte);
+        // delay(500);
+        break;
+      case 'f': // update motor F/B final position
+        dataByte = SerialUSBReadByte();
+        S.FB_final_position = dataByte;
+
+        if (F.trig_counter > trigger_num_before_fix) {
+          S.FB_motor_position = S.FB_final_position;
+          analogWrite(portMotorFB, S.FB_motor_position);
+        }
+
+        write_SD_para_S();
+
+        // user change event
+        Ev.events_id[Ev.events_num] = 22; // user change event: portMotorFB_final
+        Ev.events_time[Ev.events_num] = millis();
+        Ev.events_value[Ev.events_num] = S.FB_final_position;
+        Ev.events_num ++;
+
+        break;
+      case 'R': // updating reward value
+        buffer_tmp = SerialUSB.readStringUntil('\n');
+        S.reward_left = buffer_tmp.toFloat();
+        buffer_tmp = SerialUSB.readStringUntil('\n');
+        S.reward_right = buffer_tmp.toFloat();
+        write_SD_para_S();
+
+        valve_control(1); //  open valve 1
+        delay(uint(S.reward_left * 1000));
+        valve_control(0); // close valve 1
+        valve_control(2); //  open valve 2
+        delay(uint(S.reward_right * 1000));
+        valve_control(0); // close valve 2
+        break;
+      case 'C':
+        SerialUSB.print("C");
+        SerialUSB.print(S.FB_motor_position);
+        SerialUSB.print(";");
+        SerialUSB.print(S.LR_motor_position);
+        SerialUSB.print(";");
+        SerialUSB.print(finalPos); // pole motor position
+        SerialUSB.print(";");
+        SerialUSB.print(S.FB_final_position);
+        SerialUSB.print(";");
+        SerialUSB.print(S.reward_left);
+        SerialUSB.print(";");
+        SerialUSB.print(S.reward_right);
+        SerialUSB.print(";");
+        SerialUSB.print(scale.get_units()); // weight
+        SerialUSB.print(";");
+        SerialUSB.print(F.struggle_thres_neg);
+        SerialUSB.print(";");
+        SerialUSB.print(F.struggle_thres_pos);
+        SerialUSB.println(";");
+        break;
+      case 'T': //tare the scale to 0
+        scale.set_scale();
+        scale.tare();  //Reset the scale to 0
+        scale.set_scale(calibration_factor);
+        break;
+      case 'S': //set Struggle threshold
+        buffer_tmp = SerialUSB.readStringUntil('\n');
+        F.struggle_thres_neg = buffer_tmp.toInt();
+        buffer_tmp = SerialUSB.readStringUntil('\n');
+        F.struggle_thres_pos = buffer_tmp.toInt();
+        write_SD_para_F();
+        break;
+      default: // never happen...
+        while (SerialUSB.available()) {
+          SerialUSB.read();
+        }
+        break;
+    }
   }
 
 }// end of loop()
