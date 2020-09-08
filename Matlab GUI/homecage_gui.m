@@ -59,7 +59,7 @@ for cage_i = 1:handles.total_cage_num
         'Position',[pos(cage_i,1)+0.057,pos(cage_i,2)+0.16,0.03,0.015]); % 'ButtonDownFcn',@text_days_Buttondown,...
     
     % Popup for chosing COM port
-    if isempty(serialportlist)
+    if isempty(serialPorts.SerialPorts)
     handles.hpopup(cage_i) = uicontrol('Style','popupmenu',...
         'String',[{'Chose a port'}],... % 
         'Units', 'normalized',        'Tag', num2str(cage_i),...
@@ -322,7 +322,7 @@ handles.update_timer = timer('Name','MainTimer','TimerFcn',{@updateGUI},...
     'Period',TimerInteval,'ExecutionMode','fixedRate');
 start(handles.update_timer);
 
-SerialTimerInterval = 1;
+SerialTimerInterval = 1; % every 1 second
 handles.serial_update_timer = timer('Name','SeiralTimer','TimerFcn',{@serialTimer},...
     'Period',SerialTimerInterval,'ExecutionMode','fixedRate');
 start(handles.serial_update_timer);
@@ -685,7 +685,7 @@ start(handles.serial_update_timer);
                 fwrite(handles.s{Cage_num},uint8(str2double(get(handles.hedit_finalFB,'String')))); % Value
                 msgbox('Done!');
             case 'Reward'
-                fwrite(handles.s{Cage_num},'P'); % Command
+                fwrite(handles.s{Cage_num},'R'); % Command
                 fprintf(handles.s{Cage_num},get(handles.hedit_rewardLeft,'String'));
                 fprintf(handles.s{Cage_num},get(handles.hedit_rewardRight,'String'));
             case 'Tare'
@@ -902,7 +902,9 @@ start(handles.serial_update_timer);
         for i_cage = 1:handles.total_cage_num
             if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close')
                 % check serial port status
-                if ~ismember(handles.s{i_cage}.port, serialPorts.SerialPorts)
+                str = get(handles.hpopup(i_cage),'String');
+                value = get(handles.hpopup(i_cage),'Value');
+                if ~ismember(str{value}, serialPorts.SerialPorts)
                     % if not avaible, close
                     try
                         fclose(handles.fileID(i_cage));
@@ -912,8 +914,8 @@ start(handles.serial_update_timer);
                         disp('Close a Serial Port - Seiral Timer ...');
                         disp(e);
                     end
-                    set(source,'String','open');
-                    set_background_color(Cage_num,handles.default_color); % set default background color
+                    set(handles.hbutton_open(i_cage),'String','open');
+                    set_background_color(i_cage,handles.default_color); % set default background color
                 end
             end
         end

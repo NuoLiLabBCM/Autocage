@@ -513,7 +513,7 @@ void loop() {
           analogWrite(portMotorFB, dataByte);
           // delay(500);
           // user change event
-          Ev.events_id[Ev.events_num] = 20; // headfixation release3: struggle
+          Ev.events_id[Ev.events_num] = 20; // user change event: portMotorFB
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = S.FB_motor_position;
           Ev.events_num ++;
@@ -525,7 +525,7 @@ void loop() {
           analogWrite(portMotorLR, dataByte);
           // delay(500);
           // user change event
-          Ev.events_id[Ev.events_num] = 21; // headfixation release3: struggle
+          Ev.events_id[Ev.events_num] = 21; // user change event: portMotorLR
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = S.LR_motor_position;
           Ev.events_num ++;
@@ -540,10 +540,12 @@ void loop() {
           S.FB_final_position = dataByte;
           write_SD_para_S();
           // user change event
-          Ev.events_id[Ev.events_num] = 22; // headfixation release3: struggle
+          Ev.events_id[Ev.events_num] = 22; // user change event: portMotorFB_final
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = S.FB_final_position;
           Ev.events_num ++;
+
+          
           break;
         case 'R': // updating reward value
           buffer_tmp = SerialUSB.readStringUntil('\n');

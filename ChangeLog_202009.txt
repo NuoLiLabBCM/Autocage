@@ -29,6 +29,6 @@ Documentation:
 3.	Including folder path when talking about files
 4.	Add ‘how to upload Arduino program’
 5.	Create a ‘test’ folder for all files used only for test;
-6.	Explain state machine is coded in Arduino_Task;
+6.	Explain state machine is coded in Arduino_Master;
 7.	Add instructions for first-time use, daily maintain, changing SD card, changing mouse, pull data from SD card;
 8.	Explain datafiles in SD card and provide example script to read these files;
