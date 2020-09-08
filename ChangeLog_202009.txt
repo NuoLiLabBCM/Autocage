@@ -3,6 +3,7 @@ Hardware:
 2.	Label different Arduino with correct name; V
 3.	Use two-position toggle switch for flush and label flush side with ‘Flush’; V
 4.	Change the position of FB motor according to the default value we set (e.g., 30, instead of 0 as before) 
+5.	Add the diodes to Solenoids control circuits(2 for rewards and 1 for pole). 
 
 
 Arduino_Master:

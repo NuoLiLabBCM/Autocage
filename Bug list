@@ -1,7 +1,4 @@
-8/20/2020
-Without plugging into GUI, plug in SD card with "final config files". Hit reset, program does not run normally standalone. However, it works
-well when connecting to GUI.
-    Due to noise when power is plugged in, triggering false 'early licks'.
+
 
 
 8/20/2020
@@ -9,19 +6,6 @@ GUI saves the progress locally. GUI do not refresh when disconnecting. If connec
 the program pick up the progress from the previous box connected to GUI. Progress should be tied to the SD card, not to the board. GUI should 
 follow SD card. GUI should have NO MEMORY
     (this will be fixed in version 1.0 update)
-
-
-8/20/2020
-For a new mouse, in protocol 0, the program runs well when connected to the GUI. However, when GUI is disconnected, the programm stops running.
-
-
-
-8/20/2020
-Motor position not updated on GUI when plugged in. Motor position should be updated whenever a cage is selected.
-    (this will be fixed in version 1.0 update)
-    
-
-
 
 
 8/20/2020
@@ -69,3 +53,21 @@ PortIn should be triggered
 				CurrentEvent[nCurrentEvents] = Ev;
 				nCurrentEvents++;
 			}
+
+
+8/20/2020
+Without plugging into GUI, plug in SD card with "final config files". Hit reset, program does not run normally standalone. However, it works
+well when connecting to GUI.
+    Due to noise when power is plugged in, triggering false 'early licks'.
+
+
+8/20/2020
+For a new mouse, in protocol 0, the program runs well when connected to the GUI. However, when GUI is disconnected, the programm stops running.
+
+
+
+8/20/2020
+Motor position not updated on GUI when plugged in. Motor position should be updated whenever a cage is selected.
+    (this will be fixed in version 1.0 update)
+
+
