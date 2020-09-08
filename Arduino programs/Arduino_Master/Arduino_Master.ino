@@ -538,14 +538,20 @@ void loop() {
         case 'f': // update motor F/B final position
           dataByte = SerialUSBReadByte();
           S.FB_final_position = dataByte;
+
+          if (F.trig_counter > trigger_num_before_fix){
+            S.FB_motor_position = S.FB_final_position;
+            analogWrite(portMotorFB, S.FB_motor_position);
+          }
+          
           write_SD_para_S();
+          
           // user change event
           Ev.events_id[Ev.events_num] = 22; // user change event: portMotorFB_final
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = S.FB_final_position;
           Ev.events_num ++;
 
-          
           break;
         case 'R': // updating reward value
           buffer_tmp = SerialUSB.readStringUntil('\n');
