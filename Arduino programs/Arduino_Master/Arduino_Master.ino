@@ -561,32 +561,35 @@ void loop() {
       weight_tmp = scale.get_units(); // 165 us
       last_weight_read_time = millis();
       if (weight_tmp > 10 && weight_tmp < 40 && headfixation_flag == 0) { // avoid record many zeros
-        for (int i = 0; i < 39; i++) {
-          weighting_info[i] = weighting_info[i + 1];
-        }
-        weighting_info[39] = weight_tmp;
+        weighting_info[weight_counter] = weight_tmp;
         weight_counter++;
       }
-      if (weight_counter > 29) {
-        /*
-                // writ to SD card (optional) // 1.5 ms
-                File dataFile = SD.open("weight.txt", O_CREAT | O_APPEND | O_WRITE);
-                if (dataFile) {
-                  for (int i = 40 - weight_counter; i < 40; i++) {
-                    dataFile.println(weighting_info[i]);
-                  }
-                } else {
-                  SerialUSB.println("M: error opening weight.txt");
-                }
-                dataFile.close();
-        */
+      if (weight_counter >= 40) { // have 2-sec data in the array
 
-        // writ to PC // 0.3 ms
-        SerialUSB.write('W');
-        SerialUSBWriteShort(weight_counter);
-        SerialUSB.write((byte*)&weighting_info[40 - weight_counter], sizeof(float)*weight_counter); // weighting_info = &weighting_info[0]; start from lower byte
-        SerialUSB.println();
         weight_counter = 0;
+        
+        // writ to SD card // 2.5 ms
+        File dataFile = SD.open("weight.txt", O_CREAT | O_APPEND | O_WRITE);
+        if (dataFile) {
+          now = rtc.now();
+          dataFile.print(now.unixtime());
+          for (int i = 0; i < 40; i++) {
+            dataFile.print(" ");
+            dataFile.print(weighting_info[i]);
+          }
+          dataFile.println();
+        } else {
+          SerialUSB.println("M: error opening weight.txt");
+        }
+        dataFile.close();
+
+        /*
+          // writ to PC // 0.3 ms
+          SerialUSB.write('W');
+          SerialUSBWriteShort(weight_counter);
+          SerialUSB.write((byte*)&weighting_info[40 - weight_counter], sizeof(float)*weight_counter); // weighting_info = &weighting_info[0]; start from lower byte
+          SerialUSB.println();
+        */
       }
     }
 

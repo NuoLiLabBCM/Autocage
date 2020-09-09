@@ -75,3 +75,13 @@
  * 				timestamp: unit: 0.1 ms; 0 is start of a trial
  *
  **************EVENTST.TXT*************/
+
+
+/*************WEIGHT.TXT*************
+ *
+ * Each row is a 2-sec data segment
+ * 
+ * Column1: Unix time when the data were sent;
+ * Column2-41: weight data sampled at 20 Hz
+ *
+*************WEIGHT.TXT*************/
