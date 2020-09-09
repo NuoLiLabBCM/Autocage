@@ -60,7 +60,7 @@ for cage_i = 1:handles.total_cage_num
         'Position',[pos(cage_i,1)+0.057,pos(cage_i,2)+0.16,0.03,0.015]); % 'ButtonDownFcn',@text_days_Buttondown,...
     
     % Popup for chosing COM port
-    if isempty(serialPorts.SerialPorts)
+    if isempty(serialPorts.SerialPorts)% serialportlist
     handles.hpopup(cage_i) = uicontrol('Style','popupmenu',...
         'String',[{'Chose a port'}],... % 
         'Units', 'normalized',        'Tag', num2str(cage_i),...
@@ -70,7 +70,7 @@ for cage_i = 1:handles.total_cage_num
         'TooltipString', 'Right-click to update COM list');
     else
         handles.hpopup(cage_i) = uicontrol('Style','popupmenu',...
-        'String',[{'Chose a port'} ; serialPorts.SerialPorts],... % serialPorts.SerialPorts
+        'String',[{'Chose a port'} ; serialPorts.SerialPorts],... % serialportlist
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@popup_com_Callback,...
         'ButtonDownFcn',@popup_com_Buttondown,...
@@ -510,6 +510,10 @@ start(handles.serial_update_timer);
                 disp(e);
             end
             set(source,'String','open');
+            set(handles.htext_trailNum(Cage_num), 'String', 'Trial No.');
+            set(handles.htext_perf100(Cage_num), 'String', '0%');
+            set(handles.htext_Protocol(Cage_num), 'String', 'iProt - iTrial - 00%');
+            set(handles.htext_weight2(Cage_num), 'String', '0.0');
             set_background_color(Cage_num,handles.default_color); % set default background color
         end
     end
@@ -937,13 +941,13 @@ start(handles.serial_update_timer);
 %%%%%%%%%%%%%  Timer Callback (Update GUI)   %%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     function serialTimer(hObject, eventdata)
-        serialPorts = instrhwinfo('serial');
+        all_serialPorts = instrhwinfo('serial');
         for i_cage = 1:handles.total_cage_num
             if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close')
                 % check serial port status
                 str = get(handles.hpopup(i_cage),'String');
                 value = get(handles.hpopup(i_cage),'Value');
-                if ~ismember(str{value}, serialPorts.SerialPorts)
+                if ~ismember(str{value}, all_serialPorts.SerialPorts)
                     % if not avaible, close
                     try
                         fclose(handles.fileID(i_cage));
@@ -961,6 +965,10 @@ start(handles.serial_update_timer);
                         disp(e);
                     end
                     set(handles.hbutton_open(i_cage),'String','open');
+                    set(handles.htext_trailNum(i_cage), 'String', 'Trial No.');
+                    set(handles.htext_perf100(i_cage), 'String', '0%');
+                    set(handles.htext_Protocol(i_cage), 'String', 'iProt - iTrial - 00%');
+                    set(handles.htext_weight2(i_cage), 'String', '0.0');
                     set_background_color(i_cage,handles.default_color); % set default background color
                 end
             end
