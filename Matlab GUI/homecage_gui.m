@@ -15,6 +15,7 @@ function homecage_gui(varargin)
 %% GUI preparation
 handles.total_cage_num = 30;
 handles.default_color = [.7 .9 .8];  % default background color [.93 .93 .93];
+handles.trial_24 = [];
 
 hsv_map = hsv(24);
 handles.mymap = hsv_map(1:8,:); % 1:8 from red to yellow to green
@@ -415,23 +416,23 @@ start(handles.serial_update_timer);
                 % handles.s{Cage_num}.RecordDetail = 'verbose';
                 % record(handles.s{Cage_num});
                 
-                try
-                    Mice = get(handles.hedit_mice(Cage_num),'String');
-                    handles.fileID(Cage_num) = fopen(['./Data/Cage',Cage,'/',Mice,'/msg.txt'],'a');
-                catch e
-                    disp('Create Message File...');
-                    disp(e);
+                Mice = get(handles.hedit_mice(Cage_num),'String');
+                
+                if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 1
+                    eval(['delete ','./Data/Cage',Cage,'/',Mice,'/allmat.mat']);
                 end
+                if exist(['./Data/Cage',Cage,'/',Mice,'/msg.txt'], 'file') == 1
+                    eval(['delete ','./Data/Cage',Cage,'/',Mice,'/msg.txt']);
+                end
+
+                handles.fileID(Cage_num) = fopen(['./Data/Cage',Cage,'/',Mice,'/msg.txt'],'a');
                 
                 % trial-time and weight mat file to record
-                if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 0
-                    handles.matObj{Cage_num} = matfile(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'],'Writable',true);
-                    handles.matObj{Cage_num}.trial_time(1,1:5) = [NaN NaN NaN NaN NaN]; % trial num, datetime,trial type, outcome, is_earlylick
-                    handles.matObj{Cage_num}.weight = NaN(1,121);% 1st col: datetime; 2:121 col: weight data in float (4 bytes/data)
-                    handles.matObj{Cage_num}.startDate = handles.db_table{Cage_num}.startDate; % serial datetime % del
-                else
-                    handles.matObj{Cage_num} = matfile(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'],'Writable',true);
-                end
+                handles.matObj{Cage_num} = matfile(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'],'Writable',true);
+                handles.matObj{Cage_num}.trial_time(1,1:5) = [NaN NaN NaN NaN NaN]; % trial num, datetime,trial type, outcome, is_earlylick
+                handles.matObj{Cage_num}.weight = NaN(1,161);% 1st col: datetime; 2:161 col: weight data in float (4 bytes/data)
+                handles.matObj{Cage_num}.startDate = handles.db_table{Cage_num}.startDate; % serial datetime % del
+                %else handles.matObj{Cage_num} = matfile(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'],'Writable',true);
                 
                 % update background color
                 try
@@ -467,9 +468,9 @@ start(handles.serial_update_timer);
                 try
                     [mRow,~] = size(handles.matObj{Cage_num},'weight');
                     if mRow > 12 % 20 sec data
-                        weight_data = handles.matObj{Cage_num}.weight(mRow-12:mRow,2:121);
+                        weight_data = handles.matObj{Cage_num}.weight(mRow-12:mRow,2:161);
                     else
-                        weight_data = handles.matObj{Cage_num}.weight(1:mRow,2:121);
+                        weight_data = handles.matObj{Cage_num}.weight(1:mRow,2:161);
                     end
                     [mRow, ~] = size(weight_data); % 120 mCol
                     weight_data2 = zeros(mRow, 30);
@@ -497,6 +498,13 @@ start(handles.serial_update_timer);
                 fclose(handles.fileID(Cage_num));
                 fclose(handles.s{Cage_num});
                 delete(handles.s{Cage_num});
+                Mice = get(handles.hedit_mice(Cage_num),'String');
+                if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 1
+                    eval(['delete ','./Data/Cage',Cage,'/',Mice,'/allmat.mat']);
+                end
+                if exist(['./Data/Cage',Cage,'/',Mice,'/msg.txt'], 'file') == 1
+                    eval(['delete ','./Data/Cage',Cage,'/',Mice,'/msg.txt']);
+                end
             catch e
                 disp('Close a Serial Port...');
                 disp(e);
@@ -530,6 +538,17 @@ start(handles.serial_update_timer);
             msgbox(['The COM port of Cage ', num2str(Cage_num), ' is CLOSED!']);
             return;
         else
+            %{
+            selection = questdlg('Choose',...
+                'Do you want to pull data from SD card or plot data stored in Matlab?',...
+                'pull SD','plot data','plot data');
+            switch selection
+                case 'pull SD'
+                    fwrite(handles.s{Cage_num},'A'); % Command
+                case 'plot data'
+                    % plot
+            end
+            %}
             figure,
             % plot trial history data in last 24 hr
             subplot(3,1,1),hold on,
@@ -566,11 +585,11 @@ start(handles.serial_update_timer);
             [weight_date_48,~] = find(weight_date>current_time-2);
             [weight_date_72,~] = find(weight_date>current_time-3);
             if ~isempty(weight_date_24)
-                weight = handles.matObj{Cage_num}.weight(weight_date_24(1):mRow,1:121);
+                weight = handles.matObj{Cage_num}.weight(weight_date_24(1):mRow,1:161);
                 [mRow2,~] = size(weight);
                 weight_data = zeros(30,mRow2);
                 for i = 1:mRow2
-                    weight_data(:,i) = typecast(uint8(weight(i,2:121)), 'single')';
+                    weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
                 end
                 plot(weight(:,1),mean(weight_data),'k.');
                 %
@@ -589,12 +608,12 @@ start(handles.serial_update_timer);
                 weight_24 = edges(ind(1));
             end
             if ~isempty(weight_date_48)
-                weight = handles.matObj{Cage_num}.weight(weight_date_48(1):weight_date_24(1),1:121);
+                weight = handles.matObj{Cage_num}.weight(weight_date_48(1):weight_date_24(1),1:161);
                 [mRow2,~] = size(weight);
                 if mRow2 > 1
                     weight_data = zeros(30,mRow2);
                     for i = 1:mRow2
-                        weight_data(:,i) = typecast(uint8(weight(i,2:121)), 'single')';
+                        weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
                     end
                     [N,edges] = histcounts(weight_data(:),100);
                     ind = find(N==max(N));
@@ -604,12 +623,12 @@ start(handles.serial_update_timer);
                 end
             end
             if ~isempty(weight_date_72)
-                weight = handles.matObj{Cage_num}.weight(weight_date_72(1):weight_date_48(1),1:121);
+                weight = handles.matObj{Cage_num}.weight(weight_date_72(1):weight_date_48(1),1:161);
                 [mRow2,~] = size(weight);
                 if mRow2 > 1
                     weight_data = zeros(30,mRow2);
                     for i = 1:mRow2
-                        weight_data(:,i) = typecast(uint8(weight(i,2:121)), 'single')';
+                        weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
                     end
                     [N,edges] = histcounts(weight_data(:),100);
                     ind = find(N==max(N));
@@ -847,11 +866,11 @@ start(handles.serial_update_timer);
                     disp(e);
                 end
                 
-            case 'W' % weight
+            case 'W' % weight %% not used any more in version 1.0
                 try
                     [mRow, ~] = size(handles.matObj{i_cage},'weight');
                     handles.matObj{i_cage}.weight(mRow+1,1) = now;
-                    handles.matObj{i_cage}.weight(mRow+1,2:121) = double(uint8(A(4:123)));
+                    handles.matObj{i_cage}.weight(mRow+1,2:161) = double(uint8(A(4:163)));
                 catch e
                     disp('Serial Callback-Weight');
                     disp(size(A));
@@ -887,7 +906,27 @@ start(handles.serial_update_timer);
                     disp('Serial Callback - Control panel info');
                     disp(e);
                 end
-                
+            %{    
+            % not used
+            case 'A' % receiving trial data for the last 24-hr
+                try
+                    handles.trial_24(end+1,:) = str2num(A(2:end-2));
+                catch e
+                    disp('Serial Callback - receiving 24-hr data');
+                    disp(e);
+                end
+            case 'N' % end of receiving data and plot
+                try
+                    % plot data in handles.trial_24: col1: timestamp; col2:trial_type; col3: trial_outcome
+                    time_now = str2double(A(2:end-2));
+                    % todo
+                    % after plot, reset
+                    handles.trial_24 = [];
+                catch e
+                    disp('Serial Callback - end of receiving data and plot');
+                    disp(e);
+                end
+            %}
             otherwise
                 % fseek(handles.fileID(i_cage),0,'bof');
                 fprintf(handles.fileID(i_cage),A(4:end));
@@ -910,6 +949,13 @@ start(handles.serial_update_timer);
                         fclose(handles.fileID(i_cage));
                         fclose(handles.s{i_cage});
                         delete(handles.s{i_cage});
+                        Mice = get(handles.hedit_mice(i_cage),'String');
+                        if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat'], 'file') == 1
+                            eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat']);
+                        end
+                        if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt'], 'file') == 1
+                            eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt']);
+                        end
                     catch e
                         disp('Close a Serial Port - Seiral Timer ...');
                         disp(e);
@@ -950,9 +996,9 @@ start(handles.serial_update_timer);
                 try
                     [mRow,~] = size(handles.matObj{i_cage},'weight');
                     if mRow > 200 % 300 sec data
-                        weight_data = handles.matObj{i_cage}.weight(mRow-200:mRow,2:121);
+                        weight_data = handles.matObj{i_cage}.weight(mRow-200:mRow,2:161);
                     else
-                        weight_data = handles.matObj{i_cage}.weight(1:mRow,2:121);
+                        weight_data = handles.matObj{i_cage}.weight(1:mRow,2:161);
                     end
                     [mRow2, ~] = size(weight_data); % 120 mCol
                     weight_data2 = zeros(mRow2, 30);
@@ -1007,6 +1053,13 @@ start(handles.serial_update_timer);
                                 fclose(handles.fileID(i_cage)); % close file object
                                 fclose(handles.s{i_cage});      % close serial port
                                 delete(handles.s{i_cage});
+                                Mice = get(handles.hedit_mice(i_cage),'String');
+                                if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat'], 'file') == 1
+                                    eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat']);
+                                end
+                                if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt'], 'file') == 1
+                                    eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt']);
+                                end
                             catch e
                                 disp(e);
                             end

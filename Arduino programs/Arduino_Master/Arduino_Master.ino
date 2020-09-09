@@ -327,6 +327,7 @@ byte SecondByte;
 byte ThirdByte;
 byte ForthByte;
 String buffer_tmp;
+unsigned long unix_time_24;
 
 
 /****************************************************************************************************/
@@ -566,9 +567,7 @@ void loop() {
       }
       if (weight_counter >= 40) { // have 2-sec data in the array
 
-        weight_counter = 0;
-        
-        // writ to SD card // 2.5 ms
+        // writ to SD card // 2.5 ms?
         File dataFile = SD.open("weight.txt", O_CREAT | O_APPEND | O_WRITE);
         if (dataFile) {
           now = rtc.now();
@@ -583,13 +582,13 @@ void loop() {
         }
         dataFile.close();
 
-        /*
-          // writ to PC // 0.3 ms
-          SerialUSB.write('W');
-          SerialUSBWriteShort(weight_counter);
-          SerialUSB.write((byte*)&weighting_info[40 - weight_counter], sizeof(float)*weight_counter); // weighting_info = &weighting_info[0]; start from lower byte
-          SerialUSB.println();
-        */
+        // also writ to PC // 0.3 ms
+        SerialUSB.write('W');
+        SerialUSBWriteShort(weight_counter);
+        SerialUSB.write((byte*)&weighting_info[40 - weight_counter], sizeof(float)*weight_counter); // weighting_info = &weighting_info[0]; start from lower byte
+        SerialUSB.println();
+
+        weight_counter = 0;
       }
     }
 
@@ -775,6 +774,9 @@ void loop() {
         buffer_tmp = SerialUSB.readStringUntil('\n');
         F.struggle_thres_pos = buffer_tmp.toInt();
         write_SD_para_F();
+        break;
+      case 'A': // not used
+        send_PC_trials_24hr();
         break;
       default: // never happen...
         while (SerialUSB.available()) {
@@ -2899,6 +2901,51 @@ int send_pars_S_to_PC() {
   //SerialUSB.write((byte*)&S.totoal_reward_num, sizeof(unsigned int));
   //SerialUSB.write(S.retract_times);
 
+  //interrupts();
+  return 0;
+}
+
+int send_PC_trials_24hr() {
+  //noInterrupts();
+  unsigned long time_stamp;
+  unsigned int trial_num;
+  byte trial_type;
+  byte trial_outcome;
+  File dataFile = SD.open("trials.txt", O_READ);
+  if (dataFile) {
+    dataFile.seek(0);
+    now = rtc.now();
+    unix_time_24  = now.unixtime() - 86400; // last 24 hr = 24 * 60 *60 sec
+    while (dataFile.available()) {
+      buffer_tmp = dataFile.readStringUntil(' ');
+      time_stamp = atol(buffer_tmp.c_str());
+      if (time_stamp > unix_time_24) {
+        SerialUSB.print('A'); // All the data in last 24 hr
+        SerialUSB.print(time_stamp);
+        SerialUSB.print(' ');
+        buffer_tmp = dataFile.readStringUntil(' ');
+        buffer_tmp = dataFile.readStringUntil(' ');
+        buffer_tmp = dataFile.readStringUntil(' ');
+        buffer_tmp = dataFile.readStringUntil(' ');
+        trial_type = (byte)buffer_tmp.toInt();
+        SerialUSB.print(trial_type);
+        SerialUSB.print(' ');
+        buffer_tmp = dataFile.readStringUntil(' ');
+        trial_outcome = (byte)buffer_tmp.toInt();
+        SerialUSB.print(trial_outcome);
+        SerialUSB.println();
+        buffer_tmp = dataFile.readStringUntil('\n');
+      } else {
+        buffer_tmp = dataFile.readStringUntil('\n');
+      }
+    }
+    SerialUSB.print("N"); // end of data sending
+    SerialUSB.println(now.unixtime());
+  } else {
+    SerialUSB.println("E: error opening trials.txt for read");
+    return -1;
+  }
+  dataFile.close();
   //interrupts();
   return 0;
 }
