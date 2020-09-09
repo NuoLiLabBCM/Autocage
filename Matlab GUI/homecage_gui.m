@@ -418,10 +418,10 @@ start(handles.serial_update_timer);
                 
                 Mice = get(handles.hedit_mice(Cage_num),'String');
                 
-                if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 1
+                if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 2
                     eval(['delete ','./Data/Cage',Cage,'/',Mice,'/allmat.mat']);
                 end
-                if exist(['./Data/Cage',Cage,'/',Mice,'/msg.txt'], 'file') == 1
+                if exist(['./Data/Cage',Cage,'/',Mice,'/msg.txt'], 'file') == 2
                     eval(['delete ','./Data/Cage',Cage,'/',Mice,'/msg.txt']);
                 end
 
@@ -499,10 +499,10 @@ start(handles.serial_update_timer);
                 fclose(handles.s{Cage_num});
                 delete(handles.s{Cage_num});
                 Mice = get(handles.hedit_mice(Cage_num),'String');
-                if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 1
+                if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 2
                     eval(['delete ','./Data/Cage',Cage,'/',Mice,'/allmat.mat']);
                 end
-                if exist(['./Data/Cage',Cage,'/',Mice,'/msg.txt'], 'file') == 1
+                if exist(['./Data/Cage',Cage,'/',Mice,'/msg.txt'], 'file') == 2
                     eval(['delete ','./Data/Cage',Cage,'/',Mice,'/msg.txt']);
                 end
             catch e
@@ -950,10 +950,10 @@ start(handles.serial_update_timer);
                         fclose(handles.s{i_cage});
                         delete(handles.s{i_cage});
                         Mice = get(handles.hedit_mice(i_cage),'String');
-                        if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat'], 'file') == 1
+                        if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat'], 'file') == 2
                             eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat']);
                         end
-                        if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt'], 'file') == 1
+                        if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt'], 'file') == 2
                             eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt']);
                         end
                     catch e
@@ -1054,10 +1054,10 @@ start(handles.serial_update_timer);
                                 fclose(handles.s{i_cage});      % close serial port
                                 delete(handles.s{i_cage});
                                 Mice = get(handles.hedit_mice(i_cage),'String');
-                                if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat'], 'file') == 1
+                                if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat'], 'file') == 2
                                     eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat']);
                                 end
-                                if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt'], 'file') == 1
+                                if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt'], 'file') == 2
                                     eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt']);
                                 end
                             catch e
