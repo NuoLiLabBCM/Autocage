@@ -148,16 +148,16 @@ for cage_i = 1:handles.total_cage_num
         'String', '00%',        'Units', 'normalized',...
         'Position',[pos(cage_i,1)+0.061,pos(cage_i,2)+0.025,0.015,0.02]);
     
-    % Weight info xx g
-    handles.htext_weight1(cage_i) = uicontrol('style','text',...
-        'String', 'Weight:',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.01,pos(cage_i,2)+0.005,0.02,0.02]);
-    handles.htext_weight2(cage_i) = uicontrol('style','text',...
-        'String', '0.0',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.03,pos(cage_i,2)+0.005,0.03,0.02]);
-    handles.htext_g(cage_i) = uicontrol('style','text',...
-        'String', 'g',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.06,pos(cage_i,2)+0.005,0.005,0.02]);
+%     % Weight info xx g
+%     handles.htext_weight1(cage_i) = uicontrol('style','text',...
+%         'String', 'Weight:',        'Units', 'normalized',...
+%         'Position',[pos(cage_i,1)+0.01,pos(cage_i,2)+0.005,0.02,0.02]);
+%     handles.htext_weight2(cage_i) = uicontrol('style','text',...
+%         'String', '0.0',        'Units', 'normalized',...
+%         'Position',[pos(cage_i,1)+0.03,pos(cage_i,2)+0.005,0.03,0.02]);
+%     handles.htext_g(cage_i) = uicontrol('style','text',...
+%         'String', 'g',        'Units', 'normalized',...
+%         'Position',[pos(cage_i,1)+0.06,pos(cage_i,2)+0.005,0.005,0.02]);
     
     set_background_color(cage_i,handles.default_color); % set default background color
 end
@@ -464,6 +464,7 @@ start(handles.serial_update_timer);
                     set_background_color(Cage_num,handles.mymap(1,:));
                 end
                 
+                %{
                 % update weight
                 try
                     [mRow,~] = size(handles.matObj{Cage_num},'weight');
@@ -485,6 +486,7 @@ start(handles.serial_update_timer);
                     disp('Update GUI... weight');
                     disp(e);
                 end
+                %}
                 
                 % update days
                 set(handles.htext_days(Cage_num),'String',sprintf('%2.1f days',now - handles.db_table{Cage_num}.startDate));
@@ -513,7 +515,7 @@ start(handles.serial_update_timer);
             set(handles.htext_trailNum(Cage_num), 'String', 'Trial No.');
             set(handles.htext_perf100(Cage_num), 'String', '0%');
             set(handles.htext_Protocol(Cage_num), 'String', 'iProt - iTrial - 00%');
-            set(handles.htext_weight2(Cage_num), 'String', '0.0');
+            % set(handles.htext_weight2(Cage_num), 'String', '0.0');
             set_background_color(Cage_num,handles.default_color); % set default background color
         end
     end
@@ -542,7 +544,6 @@ start(handles.serial_update_timer);
             msgbox(['The COM port of Cage ', num2str(Cage_num), ' is CLOSED!']);
             return;
         else
-            %{
             selection = questdlg('Choose',...
                 'Do you want to pull data from SD card or plot data stored in Matlab?',...
                 'pull SD','plot data','plot data');
@@ -550,104 +551,94 @@ start(handles.serial_update_timer);
                 case 'pull SD'
                     fwrite(handles.s{Cage_num},'A'); % Command
                 case 'plot data'
-                    % plot
-            end
-            %}
-            figure,
-            % plot trial history data in last 24 hr
-            subplot(3,1,1),hold on,
-            
-            [mRow,~] = size(handles.matObj{Cage_num},'trial_time'); % trial num, datetime,trial type, outcome
-            trialData = handles.matObj{Cage_num}.trial_time(1:mRow,1:4);
-            trialData_time = trialData(:,2);
-            current_time = now;
-            [trialData_time_24,~] = find(trialData_time>current_time-1);
-            if ~isempty(trialData_time_24)
-                num_trial_24hr = numel(trialData_time_24);
-                for i = trialData_time_24(1):mRow
-                    % 'Others'-3 || Reward-1 || No Response-0 || Time Out (error)-2
-                    switch trialData(i,4)
-                        case 0
-                            plot(trialData(i,2),trialData(i,3),'bo');
-                        case 1
-                            plot(trialData(i,2),trialData(i,3),'g.','markersize',25);
-                        otherwise
-                            plot(trialData(i,2),trialData(i,3),'r.','markersize',25);
+                    % plot trial history data in last 24 hr (below)
+                    figure,
+                    subplot(3,1,1),hold on,
+                    
+                    [mRow,~] = size(handles.matObj{Cage_num},'trial_time'); % trial num, datetime,trial type, outcome
+                    trialData = handles.matObj{Cage_num}.trial_time(1:mRow,1:4);
+                    trialData_time = trialData(:,2);
+                    current_time = now;
+                    [trialData_time_24,~] = find(trialData_time>current_time-1);
+                    if ~isempty(trialData_time_24)
+                        num_trial_24hr = numel(trialData_time_24);
+                        for i = trialData_time_24(1):mRow
+                            % 'Others'-3 || Reward-1 || No Response-0 || Time Out (error)-2
+                            switch trialData(i,4)
+                                case 0
+                                    plot(trialData(i,2),trialData(i,3),'bo');
+                                case 1
+                                    plot(trialData(i,2),trialData(i,3),'g.','markersize',25);
+                                otherwise
+                                    plot(trialData(i,2),trialData(i,3),'r.','markersize',25);
+                            end
+                        end
+                        xlim([current_time-1 current_time]); ylim([-0.5 1.5]);
+                        set(gca,'ytick',[0 1],'yticklabel',{'Right','Left'});
+                        set(gca,'xtick',[current_time-1 current_time-0.75 current_time-0.5 current_time-0.25 current_time],'xticklabel',{'0','6','12','18','24'});
+                        title([num2str(num_trial_24hr), ' trials in last 24-hour']);
                     end
-                end
-                xlim([current_time-1 current_time]); ylim([-0.5 1.5]);
-                set(gca,'ytick',[0 1],'yticklabel',{'Right','Left'});
-                set(gca,'xtick',[current_time-1 current_time-0.75 current_time-0.5 current_time-0.25 current_time],'xticklabel',{'0','6','12','18','24'});
-                title([num2str(num_trial_24hr), ' trials in last 24-hour']);
-            end
-            
-            % plot weight data in last 48 hours
-            subplot(3,1,2),hold on,
-            [mRow,~] = size(handles.matObj{Cage_num},'weight');
-            weight_date = handles.matObj{Cage_num}.weight(1:mRow,1);
-            [weight_date_24,~] = find(weight_date>current_time-1);
-            [weight_date_48,~] = find(weight_date>current_time-2);
-            [weight_date_72,~] = find(weight_date>current_time-3);
-            if ~isempty(weight_date_24)
-                weight = handles.matObj{Cage_num}.weight(weight_date_24(1):mRow,1:161);
-                [mRow2,~] = size(weight);
-                weight_data = zeros(30,mRow2);
-                for i = 1:mRow2
-                    weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
-                end
-                plot(weight(:,1),mean(weight_data),'k.');
-                %
-                %             sample_ind = 20:20:mRow2;
-                %             weight_data_avg = zeros(numel(sample_ind),1);
-                %             for i = 1:numel(sample_ind)
-                %                 weight_data_tmp = weight_data(:,sample_ind(i)-19:sample_ind(i));
-                %                 [N,edges] = histcounts(weight_data_tmp(:),20);
-                %                 max_weight = edges(N==max(N));
-                %                 weight_data_avg(i) = max_weight(1);
-                %             end
-                %             plot(weight(20:20:mRow2,1),weight_data_avg,'linewidth',3);
-                %
-                [N,edges] = histcounts(weight_data(:),100);
-                ind = find(N==max(N));
-                weight_24 = edges(ind(1));
-            end
-            if ~isempty(weight_date_48)
-                weight = handles.matObj{Cage_num}.weight(weight_date_48(1):weight_date_24(1),1:161);
-                [mRow2,~] = size(weight);
-                if mRow2 > 1
-                    weight_data = zeros(30,mRow2);
-                    for i = 1:mRow2
-                        weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
+                    
+                    % plot weight data in last 48 hours
+                    subplot(3,1,2),hold on,
+                    [mRow,~] = size(handles.matObj{Cage_num},'weight');
+                    weight_date = handles.matObj{Cage_num}.weight(1:mRow,1);
+                    [weight_date_24,~] = find(weight_date>current_time-1);
+                    %[weight_date_48,~] = find(weight_date>current_time-2);
+                    %[weight_date_72,~] = find(weight_date>current_time-3);
+                    if ~isempty(weight_date_24)
+                        weight = handles.matObj{Cage_num}.weight(weight_date_24(1):mRow,1:161);
+                        [mRow2,~] = size(weight);
+                        weight_data = zeros(30,mRow2);
+                        for i = 1:mRow2
+                            weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
+                        end
+                        plot(weight(:,1),mean(weight_data),'k.');
+                        [N,edges] = histcounts(weight_data(:),100);
+                        ind = find(N==max(N));
+                        weight_24 = edges(ind(1));
                     end
-                    [N,edges] = histcounts(weight_data(:),100);
-                    ind = find(N==max(N));
-                    weight_48 = edges(ind(1));
-                else
-                    weight_48 = NaN;
-                end
-            end
-            if ~isempty(weight_date_72)
-                weight = handles.matObj{Cage_num}.weight(weight_date_72(1):weight_date_48(1),1:161);
-                [mRow2,~] = size(weight);
-                if mRow2 > 1
-                    weight_data = zeros(30,mRow2);
-                    for i = 1:mRow2
-                        weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
+                    %{
+                    if ~isempty(weight_date_48)
+                        weight = handles.matObj{Cage_num}.weight(weight_date_48(1):weight_date_24(1),1:161);
+                        [mRow2,~] = size(weight);
+                        if mRow2 > 1
+                            weight_data = zeros(30,mRow2);
+                            for i = 1:mRow2
+                                weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
+                            end
+                            [N,edges] = histcounts(weight_data(:),100);
+                            ind = find(N==max(N));
+                            weight_48 = edges(ind(1));
+                        else
+                            weight_48 = NaN;
+                        end
                     end
-                    [N,edges] = histcounts(weight_data(:),100);
-                    ind = find(N==max(N));
-                    weight_72 = edges(ind(1));
-                else
-                    weight_72 = NaN;
-                end
+                    if ~isempty(weight_date_72)
+                        weight = handles.matObj{Cage_num}.weight(weight_date_72(1):weight_date_48(1),1:161);
+                        [mRow2,~] = size(weight);
+                        if mRow2 > 1
+                            weight_data = zeros(30,mRow2);
+                            for i = 1:mRow2
+                                weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
+                            end
+                            [N,edges] = histcounts(weight_data(:),100);
+                            ind = find(N==max(N));
+                            weight_72 = edges(ind(1));
+                        else
+                            weight_72 = NaN;
+                        end
+                    end
+                    %}
+                    % title(['Avg. ', num2str(weight_24), ' g in 24-hr (48-hr: ', num2str(weight_48),' g, 72-hr: ',num2str(weight_72), ' g)']);
+                    title(['Avg. ', num2str(weight_24), ' g in last 24-hr']);
+                    xlim([current_time-1 current_time]);
+                    ylabel('weight (g)'); xlabel('Time (hour)'); ylim([15 30]);
+                    set(gca,'xtick',[current_time-1 current_time-22/24 current_time-20/24 current_time-18/24 current_time-16/24 ...
+                        current_time-14/24 current_time-12/24 current_time-10/24 current_time-8/24 current_time-6/24 ...
+                        current_time-4/24 current_time-2/24 current_time],...
+                        'xticklabel',{'0','2','4','6','8','10','12','14','16','18','20','22','24'});
             end
-            title(['Avg. ', num2str(weight_24), ' g in 24-hr (48-hr: ', num2str(weight_48),' g, 72-hr: ',num2str(weight_72), ' g)']);
-            xlim([current_time-1 current_time]);
-            ylabel('weight (g)'); xlabel('Time (hour)'); ylim([15 30]);
-            set(gca,'xtick',[current_time-1 current_time-22/24 current_time-20/24 current_time-18/24 current_time-16/24 ...
-                current_time-14/24 current_time-12/24 current_time-10/24 current_time-8/24 current_time-6/24 ...
-                current_time-4/24 current_time-2/24 current_time],...
-                'xticklabel',{'0','2','4','6','8','10','12','14','16','18','20','22','24'});
         end
     end
 
@@ -910,8 +901,7 @@ start(handles.serial_update_timer);
                     disp('Serial Callback - Control panel info');
                     disp(e);
                 end
-            %{    
-            % not used
+            % 
             case 'A' % receiving trial data for the last 24-hr
                 try
                     handles.trial_24(end+1,:) = str2num(A(2:end-2));
@@ -923,14 +913,32 @@ start(handles.serial_update_timer);
                 try
                     % plot data in handles.trial_24: col1: timestamp; col2:trial_type; col3: trial_outcome
                     time_now = str2double(A(2:end-2));
-                    % todo
+                    if isempty (handles.trial_24)
+                        figure, subplot(2,1,1), title('No trial in last 24 hrs');
+                    else
+                        timestamp = handles.trial_24(:,1);
+                        trial_type = handles.trial_24(:,2);
+                        trial_outcome = handles.trial_24(:,3);
+                        % 'Others'-3 || Reward-1 || No Response-0 || Time Out (error)-2
+                        no_response = (trial_outcome == 0);
+                        correct = (trial_outcome == 1);
+                        error = (trial_outcome == 2);
+                        figure, subplot(2,1,1), hold on,
+                        plot(timestamp(no_response),trial_type(no_response),'bo');
+                        plot(timestamp(correct),trial_type(correct),'g.','markersize',25);
+                        plot(timestamp(error),trial_type(error),'r.','markersize',25);
+                        xlim([time_now-24*3600 time_now]); ylim([-0.5 1.5]);
+                        set(gca,'ytick',[0 1],'yticklabel',{'Right','Left'});
+                        set(gca,'xtick',[time_now-24*3600 time_now-18*3600 time_now-12*3600 time_now-6*3600 time_now],'xticklabel',{'0','6','12','18','24'});
+                        title([num2str(timestamp), ' trials in last 24-hour']);
+                    end
                     % after plot, reset
                     handles.trial_24 = [];
                 catch e
                     disp('Serial Callback - end of receiving data and plot');
                     disp(e);
                 end
-            %}
+            
             otherwise
                 % fseek(handles.fileID(i_cage),0,'bof');
                 fprintf(handles.fileID(i_cage),A(4:end));
@@ -968,7 +976,7 @@ start(handles.serial_update_timer);
                     set(handles.htext_trailNum(i_cage), 'String', 'Trial No.');
                     set(handles.htext_perf100(i_cage), 'String', '0%');
                     set(handles.htext_Protocol(i_cage), 'String', 'iProt - iTrial - 00%');
-                    set(handles.htext_weight2(i_cage), 'String', '0.0');
+                    % set(handles.htext_weight2(i_cage), 'String', '0.0');
                     set_background_color(i_cage,handles.default_color); % set default background color
                 end
             end
@@ -1000,6 +1008,7 @@ start(handles.serial_update_timer);
                     set_background_color(i_cage,handles.mymap(1,:));
                 end
                 
+                %{
                 % update weight
                 try
                     [mRow,~] = size(handles.matObj{i_cage},'weight');
@@ -1009,7 +1018,7 @@ start(handles.serial_update_timer);
                         weight_data = handles.matObj{i_cage}.weight(1:mRow,2:161);
                     end
                     [mRow2, ~] = size(weight_data); % 120 mCol
-                    weight_data2 = zeros(mRow2, 30);
+                    weight_data2 = zeros(mRow2, 40);
                     for k = 1:mRow2
                         weight_data2(k,:) = typecast(uint8(weight_data(k,:)), 'single');
                     end
@@ -1020,6 +1029,7 @@ start(handles.serial_update_timer);
                     disp('Update GUI... weight');
                     disp(e);
                 end
+                %}
                 
                 % update days
                 set(handles.htext_days(i_cage),'String',sprintf('%2.1f days',now - handles.db_table{i_cage}.startDate));
@@ -1106,9 +1116,11 @@ start(handles.serial_update_timer);
         % set(handles.htext_hf3(ind),'BackgroundColor',color);
         % set(handles.htext_perf30(ind),'BackgroundColor',color);
         % set(handles.htext_percent2(ind),'BackgroundColor',color);
-        set(handles.htext_weight1(ind),'BackgroundColor',color);
-        set(handles.htext_weight2(ind),'BackgroundColor',color);
-        set(handles.htext_g(ind),'BackgroundColor',color);
+        
+        % set(handles.htext_weight1(ind),'BackgroundColor',color);
+        % set(handles.htext_weight2(ind),'BackgroundColor',color);
+        % set(handles.htext_g(ind),'BackgroundColor',color);
+        
         set(handles.htext_early(ind),'BackgroundColor',color);
         set(handles.htext_earlylick(ind),'BackgroundColor',color);
     end
