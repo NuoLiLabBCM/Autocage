@@ -8,7 +8,7 @@ Hardware:
 
 Arduino_Master:
 1.	If SD card is not presented, pause the system; V
-2.	Add module to send last-24-hour data from SD card; (implemented but NOT USED, needs tens of seconds)
+2.	Add module to send last-24-hour data from SD card; V(implemented, needs tens of seconds)
 3.	Read parameter files every time Rocker switch ON, so that when changing a SD card, reset is not necessary; V
 4.	Additional parameter for final position for FB motor, and will be updated by GUI; V
 5.	Change parameter files into human-readable text file (instead of a binary file); V
@@ -18,12 +18,13 @@ Arduino_Master:
 
 
 Matlab GUI:
-1.	Delete all the data once the COM port is closed; only plot data accumulated in Matlab V
+1.	Delete all the data once the COM port is closed V
 2.	Add additional panel for updating reward size on Arduino (and also add a ‘reward’ button); V
 3.	Add ‘read’ button for the motor position and automatically update motor position when a cage is selected; “move” BF final position. V
 4.	Periodically (every second) check COM port, if not available, disconnect it. V
 5.	Add ‘tare’ weighting stage button; read threshold values; read the weight; V
 6.  Remove the weight info display; V
+7.	add user option to pull data from SD card or plot data accumulated in Matlab V
 
 
 Documentation:
