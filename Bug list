@@ -2,13 +2,6 @@
 
 
 8/20/2020
-GUI saves the progress locally. GUI do not refresh when disconnecting. If connecting to a new GUI window using a previously used mouse name, 
-the program pick up the progress from the previous box connected to GUI. Progress should be tied to the SD card, not to the board. GUI should 
-follow SD card. GUI should have NO MEMORY
-    (this will be fixed in version 1.0 update)
-
-
-8/20/2020
 Documentation of Testing should include a brief instruction on how to upload Arduino program that include the 
 following information:
 1) Where to install Arduino program
@@ -68,6 +61,12 @@ For a new mouse, in protocol 0, the program runs well when connected to the GUI.
 
 8/20/2020
 Motor position not updated on GUI when plugged in. Motor position should be updated whenever a cage is selected.
+    (this will be fixed in version 1.0 update)
+	
+8/20/2020
+GUI saves the progress locally. GUI do not refresh when disconnecting. If connecting to a new GUI window using a previously used mouse name, 
+the program pick up the progress from the previous box connected to GUI. Progress should be tied to the SD card, not to the board. GUI should 
+follow SD card. GUI should have NO MEMORY
     (this will be fixed in version 1.0 update)
 
 
