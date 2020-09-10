@@ -1,6 +1,6 @@
 clear
 %%
-data_folder = 'C:\Projects\Homecage system\Data\';
+data_folder = '.\Data\';
 Mouse_ID    = 'YH100'; % folder
 
 %% load event data
