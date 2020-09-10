@@ -1,3 +1,7 @@
+9/10/2020
+Version 1.0
+If a cage is connect to matlab GUI. Then disconnect from the GUI and USB. Cage will be stuck. 
+When in this state, loading new programs onto SD card won’t update. The cage is completely stuck
 
 
 
