@@ -335,10 +335,9 @@ unsigned long unix_time_24;
 /****************************************************************************************************/
 
 void setup() {
-  //delay(3000);
+  //delay(3000); // for debug
 
   SerialUSB.begin(115200);   // To PC for debug info and/or Data
-  //while (!SerialUSB);
 
   Serial1.begin(115200);     // To Bpod
   while (Serial1.available()) {
@@ -387,7 +386,7 @@ void setup() {
     SerialUSB.println("E: Couldn't find RT Clock");
     //return;
   }
-  if (! rtc.initialized()) {
+  if (! rtc.initialized()) { // never happen
     SerialUSB.println("M: RTC is NOT running! Adjust Time!");
     // following line sets the RTC to the date & time this sketch was compiled
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -464,8 +463,9 @@ void loop() {
 
       ledState = HIGH;
       digitalWriteDirect(ledPin, ledState);
-
-      SerialUSB.println("M: Program RESUME!!!");
+      if (SerialUSB.dtr() && SerialUSB_connected()) {
+        SerialUSB.println("M: Program RESUME!!!");
+      }
 
       // clear serial1 buffer
       while (Serial1.available()) {
@@ -533,7 +533,9 @@ void loop() {
       delay(50);
       valve_control(0); // close valve 1 and 2
       last_reward_time = millis();
-      SerialUSB.println("M: No Reward in Last 3 Hours.");
+      if (SerialUSB.dtr() && SerialUSB_connected()) {
+        SerialUSB.println("M: No Reward in Last 3 Hours.");
+      }
 
       timed_drop_count++;
 
@@ -544,15 +546,19 @@ void loop() {
         delay(70);
         valve_control(0); // close valve 1 and 2
         last_reward_time = millis();
-        SerialUSB.println("E: No Reward in Last 12 Hours.");
+        if (SerialUSB.dtr() && SerialUSB_connected()) {
+          SerialUSB.println("E: No Reward in Last 12 Hours.");
+        }
 
         if (F.fixation_duration <= 3000 && S.retract_times < 8 && S.FB_motor_position < 50 + S.FB_final_position) { // && F.trig_counter < 30
           // check if move the lickport closer to mouse to lure them in // todo: move back more frequent but retracting faster
           S.FB_motor_position = 50 + S.FB_final_position;
           analogWrite(portMotorFB, S.FB_motor_position);
           S.retract_times++;
-          SerialUSB.print("E: Motor retracted back NO. ");
-          SerialUSB.println(S.retract_times);
+          if (SerialUSB.dtr() && SerialUSB_connected()) {
+            SerialUSB.print("E: Motor retracted back NO. ");
+            SerialUSB.println(S.retract_times);
+          }
         }
       }
     }
@@ -578,15 +584,19 @@ void loop() {
           }
           dataFile.println();
         } else {
-          SerialUSB.println("M: error opening weight.txt");
+          if (SerialUSB.dtr() && SerialUSB_connected()) {
+            SerialUSB.println("M: error opening weight.txt");
+          }
         }
         dataFile.close();
 
         // also writ to PC // 0.3 ms
-        SerialUSB.write('W');
-        SerialUSBWriteShort(weight_counter);
-        SerialUSB.write((byte*)&weighting_info[40 - weight_counter], sizeof(float)*weight_counter); // weighting_info = &weighting_info[0]; start from lower byte
-        SerialUSB.println();
+        if (SerialUSB.dtr() && SerialUSB_connected()) {
+          SerialUSB.write('W');
+          SerialUSBWriteShort(weight_counter);
+          SerialUSB.write((byte*)&weighting_info[40 - weight_counter], sizeof(float)*weight_counter); // weighting_info = &weighting_info[0]; start from lower byte
+          SerialUSB.println();
+        }
 
         weight_counter = 0;
       }
@@ -617,7 +627,6 @@ void loop() {
     }
     // current fixation event info
     if (Ev.events_num > 0) {
-      //SerialUSB.println(Ev.events_num);
       write_SD_event_fixation();
       Ev.events_num = 0;
     }
@@ -651,8 +660,9 @@ void loop() {
       Serial1.write('O');
       Serial1.write('B');
       Serial1.write(byte(0));
-
-      SerialUSB.println("M: Program PAUSED!!!");
+      if (SerialUSB.dtr() && SerialUSB_connected()) {
+        SerialUSB.println("M: Program PAUSED!!!");
+      }
       printCurrentTime(); // print current time and date
     }
     if (ledState == LOW) {
@@ -673,8 +683,7 @@ void loop() {
     // L for Motor LR,
     // P for Motor for pole
     // f for final motor FB position
-    // R for reward size
-    // r for free reward
+    // R for reward size and free reward
     // C for control panel info retrival
     // T for tare weighting stage
     switch (CommandByte) {
@@ -1211,7 +1220,9 @@ int send_protocol_to_Bpod_and_Run() {
   // Send 'R' to Bpod to run the state machine
   RunStateMatrix();
   protocol_sent = 1;
-  SerialUSB.println("M: Bpod Running...");
+  if (SerialUSB.dtr() && SerialUSB_connected()) {
+    SerialUSB.println("M: Bpod Running...");
+  }
 
 } // end for send_protocol_to_Bpod_and_Run()
 
@@ -1277,7 +1288,9 @@ int Read_Data_from_Bpod() {
       Serial1.read(); // clear serial1 dirty data
     }
     nEvents = 0; nTransition = 0;
-    SerialUSB.println("E: Receiving Bpod Data Error...");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: Receiving Bpod Data Error...");
+    }
   }
 
   if (Serial1.available()) {
@@ -1315,7 +1328,9 @@ int Read_Data_from_Bpod() {
     }
     dataFile.println();
   } else {
-    SerialUSB.println("M: error opening eventsT.txt");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("M: error opening eventsT.txt");
+    }
   }
   dataFile.close();
 
@@ -1415,60 +1430,62 @@ int Read_Data_from_Bpod() {
 }
 
 void PrintResult2PC() {
-  SerialUSB.print("Trial No.:");
-  SerialUSB.print(S.currentTrialNum);
-  SerialUSB.print("; Perf100:");
-  SerialUSB.print(Perf100);
-  SerialUSB.print("%; R:");
-  SerialUSB.print(S.ProtocolHistoryIndex);
-  SerialUSB.print(" - ");
-  SerialUSB.print(S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials);
-  SerialUSB.print(" - ");
-  SerialUSB.print(S.ProtocolHistory[S.ProtocolHistoryIndex].performance);
-  SerialUSB.print("%; early:");
-  SerialUSB.println(is_earlylick);
+  if (SerialUSB.dtr() && SerialUSB_connected()) {
+    SerialUSB.print("Trial No.:");
+    SerialUSB.print(S.currentTrialNum);
+    SerialUSB.print("; Perf100:");
+    SerialUSB.print(Perf100);
+    SerialUSB.print("%; R:");
+    SerialUSB.print(S.ProtocolHistoryIndex);
+    SerialUSB.print(" - ");
+    SerialUSB.print(S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials);
+    SerialUSB.print(" - ");
+    SerialUSB.print(S.ProtocolHistory[S.ProtocolHistoryIndex].performance);
+    SerialUSB.print("%; early:");
+    SerialUSB.println(is_earlylick);
 
-  SerialUSB.print("Protocol:");
-  switch (S.ProtocolType) {
-    case P_FIXATION:
-      SerialUSB.print("P_FIXATION");
-      break;
-    case P_SAMPLE:
-      SerialUSB.print("P_SAMPLE");
-      break;
-    case P_DELAY:
-      SerialUSB.print("P_DELAY");
-      break;
-    case P_OPTOSTIM:
-      SerialUSB.print("P_OPTOSTIM");
-      break;
-  }
-  SerialUSB.print("; TrialType:");
-  if (S.TrialType == 0) {
-    SerialUSB.print("Right");
-  } else if (S.TrialType == 1) {
-    SerialUSB.print("Left");
-  } else {
-    SerialUSB.print("Either-");
-    if (either_left_right == 1) {
-      SerialUSB.print("Left");
-    } else if (either_left_right == 0) {
-      SerialUSB.print("Right");
+    SerialUSB.print("Protocol:");
+    switch (S.ProtocolType) {
+      case P_FIXATION:
+        SerialUSB.print("P_FIXATION");
+        break;
+      case P_SAMPLE:
+        SerialUSB.print("P_SAMPLE");
+        break;
+      case P_DELAY:
+        SerialUSB.print("P_DELAY");
+        break;
+      case P_OPTOSTIM:
+        SerialUSB.print("P_OPTOSTIM");
+        break;
     }
-  }
-  SerialUSB.print("; Outcome:");
-  SerialUSB.print(S.Trial_Outcome);
-  SerialUSB.print("; Reward No.:");
-  SerialUSB.println(S.totoal_reward_num);
-  //SerialUSB.print("Perf30      : ");
-  //SerialUSB.print(S.ProtocolHistory[S.ProtocolHistoryIndex].performance);
-  //SerialUSB.println("%");
+    SerialUSB.print("; TrialType:");
+    if (S.TrialType == 0) {
+      SerialUSB.print("Right");
+    } else if (S.TrialType == 1) {
+      SerialUSB.print("Left");
+    } else {
+      SerialUSB.print("Either-");
+      if (either_left_right == 1) {
+        SerialUSB.print("Left");
+      } else if (either_left_right == 0) {
+        SerialUSB.print("Right");
+      }
+    }
+    SerialUSB.print("; Outcome:");
+    SerialUSB.print(S.Trial_Outcome);
+    SerialUSB.print("; Reward No.:");
+    SerialUSB.println(S.totoal_reward_num);
+    //SerialUSB.print("Perf30      : ");
+    //SerialUSB.print(S.ProtocolHistory[S.ProtocolHistoryIndex].performance);
+    //SerialUSB.println("%");
 
-  if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > S.FB_final_position) {
-    SerialUSB.print("M: Motor Pos: ");
-    SerialUSB.print(S.FB_motor_position);
-    SerialUSB.print("; Trig No.: ");
-    SerialUSB.println(F.trig_counter);
+    if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > S.FB_final_position) {
+      SerialUSB.print("M: Motor Pos: ");
+      SerialUSB.print(S.FB_motor_position);
+      SerialUSB.print("; Trig No.: ");
+      SerialUSB.println(F.trig_counter);
+    }
   }
 }
 
@@ -1612,10 +1629,12 @@ int autoChangeProtocol() {
           //          Ev.events_time[Ev.events_num] = millis();
           //          Ev.events_value[Ev.events_num] = S.FB_motor_position;
           //          Ev.events_num ++;
-          SerialUSB.print("M: Motor advanced to ");
-          SerialUSB.print(S.FB_motor_position);
-          SerialUSB.print(", final position: ");
-          SerialUSB.println(S.FB_final_position);
+          if (SerialUSB.dtr() && SerialUSB_connected()) {
+            SerialUSB.print("M: Motor advanced to ");
+            SerialUSB.print(S.FB_motor_position);
+            SerialUSB.print(", final position: ");
+            SerialUSB.println(S.FB_final_position);
+          }
         }
       }
 
@@ -1926,22 +1945,28 @@ void autoAdjustLickportPosition() {
 
       if (condition1 | condition2) { // move lickprot
         LickPortMove = 0;
-        SerialUSB.print("E: bias to ");
+        String str_tmp;
+        byte motor_tmp;
         if (Perf_R > Perf_L) { // right port too close
-          SerialUSB.print("right: ");
-          SerialUSB.print(S.LR_motor_position);
+          str_tmp = "right: ";
+          motor_tmp = S.LR_motor_position;
           if (S.LR_motor_position <= 90) {
             S.LR_motor_position = S.LR_motor_position + mov_step_size;
           }
         } else if (Perf_R < Perf_L) {               // left port too close
-          SerialUSB.print("left: ");
-          SerialUSB.print(S.LR_motor_position);
+          str_tmp = "left: ";
+          motor_tmp = S.LR_motor_position;
           if (S.LR_motor_position >= 50) {
             S.LR_motor_position = S.LR_motor_position - mov_step_size;
           }
         }
-        SerialUSB.print(" -> ");
-        SerialUSB.println(S.LR_motor_position);
+        if (SerialUSB.dtr() && SerialUSB_connected()) {
+          SerialUSB.print("E: bias to ");
+          SerialUSB.print(str_tmp);
+          SerialUSB.print(motor_tmp);
+          SerialUSB.print(" -> ");
+          SerialUSB.println(S.LR_motor_position);
+        }
 
         //        Ev.events_id[Ev.events_num] = 6; // left/right motor move
         //        Ev.events_time[Ev.events_num] = millis();
@@ -2166,9 +2191,10 @@ void switch_fixation_state() {
         Ev.events_time[Ev.events_num] = millis();
         Ev.events_value[Ev.events_num] = -1;
         Ev.events_num ++;
-
-        SerialUSB.print("M: Switch triggered NO. ");
-        SerialUSB.println(F.trig_counter);
+        if (SerialUSB.dtr() && SerialUSB_connected()) {
+          SerialUSB.print("M: Switch triggered NO. ");
+          SerialUSB.println(F.trig_counter);
+        }
         if (F.trig_counter > trigger_num_before_fix && S.FB_motor_position <= S.FB_final_position) {
           timer_state = DELAY_TO_FIX;
           //SerialUSB.print("Headfixation state changed to: ");
@@ -2208,11 +2234,12 @@ void switch_fixation_state() {
 
           //            weighting_info[39] = 2000;
           //            weight_counter++;
-
-          SerialUSB.print("M: Head fixation (again) NO. ");
-          SerialUSB.print(F.headfixation_counter);
-          SerialUSB.print(", interval: ");
-          SerialUSB.println(F.fixation_duration);
+          if (SerialUSB.dtr() && SerialUSB_connected()) {
+            SerialUSB.print("M: Head fixation (again) NO. ");
+            SerialUSB.print(F.headfixation_counter);
+            SerialUSB.print(", interval: ");
+            SerialUSB.println(F.fixation_duration);
+          }
 
           headfixation_flag = 1;
           last_state_time = millis();
@@ -2227,11 +2254,12 @@ void switch_fixation_state() {
 
           //            weighting_info[39] = 1000;
           //            weight_counter++;
-
-          SerialUSB.print("M: Head fixation NO. ");
-          SerialUSB.print(F.headfixation_counter);
-          SerialUSB.print(", interval: ");
-          SerialUSB.println(F.fixation_duration);
+          if (SerialUSB.dtr() && SerialUSB_connected()) {
+            SerialUSB.print("M: Head fixation NO. ");
+            SerialUSB.print(F.headfixation_counter);
+            SerialUSB.print(", interval: ");
+            SerialUSB.println(F.fixation_duration);
+          }
           if (F.fixation_duration > 10000) { // behavioral protocol: S.ProtocolHistoryIndex > 1
             last_state_time = millis();
             timer_state = HEAD_FIXATION_DELAY;
@@ -2281,12 +2309,13 @@ void switch_fixation_state() {
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = (millis() - last_state_time);
           Ev.events_num ++;
-
-          SerialUSB.print("M: Released - struggle!, interval: ");
-          SerialUSB.print(Ev.events_value[Ev.events_num - 1] / 1000);
-          SerialUSB.print("; ");
-          SerialUSB.print(weight_tmp);
-          SerialUSB.println(" g, DETECTED.");
+          if (SerialUSB.dtr() && SerialUSB_connected()) {
+            SerialUSB.print("M: Released - struggle!, interval: ");
+            SerialUSB.print(Ev.events_value[Ev.events_num - 1] / 1000);
+            SerialUSB.print("; ");
+            SerialUSB.print(weight_tmp);
+            SerialUSB.println(" g, DETECTED.");
+          }
           timer_state = STRUGGLE_DELAY_1000;
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("STRUGGLE_DELAY_1000");
@@ -2321,13 +2350,14 @@ void switch_fixation_state() {
             F.Fixation_Outcome[19] = 10;
             para_F_changed = 1;
           }
-
-          SerialUSB.print("M: Released - escape!, interval: ");
-          SerialUSB.print(Ev.events_value[Ev.events_num - 1] / 1000);
-          SerialUSB.print("; ");
-          SerialUSB.print("Performance: ");
-          SerialUSB.print(compare_array_sum(F.Fixation_Outcome, 9, 0, 20));
-          SerialUSB.println("/20");
+          if (SerialUSB.dtr() && SerialUSB_connected()) {
+            SerialUSB.print("M: Released - escape!, interval: ");
+            SerialUSB.print(Ev.events_value[Ev.events_num - 1] / 1000);
+            SerialUSB.print("; ");
+            SerialUSB.print("Performance: ");
+            SerialUSB.print(compare_array_sum(F.Fixation_Outcome, 9, 0, 20));
+            SerialUSB.println("/20");
+          }
           timer_state = ESCAPE_DELAY_1000;
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("ESCAPE_DELAY_1000");
@@ -2361,11 +2391,12 @@ void switch_fixation_state() {
             }
             F.Fixation_Outcome[19] = 9;
             para_F_changed = 1;
-
-            SerialUSB.print("M: Released - timeup! ");
-            SerialUSB.print("Performance: ");
-            SerialUSB.print(compare_array_sum(F.Fixation_Outcome, 9, 0, 20));
-            SerialUSB.println("/20");
+            if (SerialUSB.dtr() && SerialUSB_connected()) {
+              SerialUSB.print("M: Released - timeup! ");
+              SerialUSB.print("Performance: ");
+              SerialUSB.print(compare_array_sum(F.Fixation_Outcome, 9, 0, 20));
+              SerialUSB.println("/20");
+            }
             timer_state = TIMEUP_DELAY_1000;
             //SerialUSB.print("Headfixation state changed to: ");
             //SerialUSB.println("TIMEUP_DELAY_1000");
@@ -2419,10 +2450,11 @@ void switch_fixation_state() {
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("CHECK_TRIG");
         }
-
-        SerialUSB.print("M: Performance: ");
-        SerialUSB.print(compare_array_sum(F.Fixation_Outcome, 9, 0, 20));
-        SerialUSB.println("/20");
+        if (SerialUSB.dtr() && SerialUSB_connected()) {
+          SerialUSB.print("M: Performance: ");
+          SerialUSB.print(compare_array_sum(F.Fixation_Outcome, 9, 0, 20));
+          SerialUSB.println("/20");
+        }
       }
       break;
 
@@ -2512,7 +2544,9 @@ int write_SD_para_F() {
     dataFile.print("fixation_interval_max = ");
     dataFile.println(F.fixation_interval_max);
   } else {
-    SerialUSB.println("E: error opening paraF.txt");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: error opening paraF.txt");
+    }
     return -1;
   }
   dataFile.close();
@@ -2557,7 +2591,9 @@ int read_SD_para_F() {
     buffer_tmp = dataFile.readStringUntil('\n');
     F.fixation_interval_max = buffer_tmp.toInt();
   } else {
-    SerialUSB.println("E: error opening paraF.txt");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: error opening paraF.txt");
+    }
     return -1;
   }
   dataFile.close();
@@ -2659,7 +2695,9 @@ int write_SD_para_S() {
     dataFile.print("reward_right = ");
     dataFile.println(S.reward_right);
   } else {
-    SerialUSB.println("E: error opening paraS.txt");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: error opening paraS.txt");
+    }
     return -1;
   }
   dataFile.close();
@@ -2786,7 +2824,9 @@ int read_SD_para_S() {
     buffer_tmp = dataFile.readStringUntil('\n');
     S.reward_right = buffer_tmp.toFloat();
   } else {
-    SerialUSB.println("E: error opening paraS.txt");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: error opening paraS.txt");
+    }
     return -1;
   }
   dataFile.close();
@@ -2806,7 +2846,9 @@ int write_SD_event_fixation() {
       dataFile.println(Ev.events_value[i]);
     }
   } else {
-    SerialUSB.println("E: error opening events.txt");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: error opening events.txt");
+    }
     return -1;
   }
   dataFile.close();
@@ -2855,7 +2897,9 @@ int write_SD_trial_info() {
 
     dataFile.println();
   } else {
-    SerialUSB.println("E: error opening trials.txt");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: error opening trials.txt");
+    }
     return -1;
   }
   dataFile.close();
@@ -2863,46 +2907,47 @@ int write_SD_trial_info() {
   return 0;
 }
 
-int send_pars_S_to_PC() {
-  //noInterrupts();
-  SerialUSB.write('S'); // Event and timestamp
-  SerialUSB.write((byte*)&S.currentTrialNum, sizeof(unsigned int));
-  SerialUSB.write((byte*)&S.FB_motor_position, sizeof(int));
-  SerialUSB.write(S.ProtocolType);
-  SerialUSB.write(S.Autolearn);
-  SerialUSB.write(S.TrialType);
-  SerialUSB.write((byte*)&S.random_delay_duration, sizeof(int));
-  SerialUSB.write(S.Trial_Outcome);
+void send_pars_S_to_PC() { // NOT USED!!!
+  if (SerialUSB.dtr() && SerialUSB_connected()) {
+    //noInterrupts();
+    SerialUSB.write('S'); // Event and timestamp
+    SerialUSB.write((byte*)&S.currentTrialNum, sizeof(unsigned int));
+    SerialUSB.write((byte*)&S.FB_motor_position, sizeof(int));
+    SerialUSB.write(S.ProtocolType);
+    SerialUSB.write(S.Autolearn);
+    SerialUSB.write(S.TrialType);
+    SerialUSB.write((byte*)&S.random_delay_duration, sizeof(int));
+    SerialUSB.write(S.Trial_Outcome);
 
-  SerialUSB.write((byte*)&S.SamplePeriod, sizeof(float));
-  SerialUSB.write((byte*)&S.DelayPeriod, sizeof(float));
-  SerialUSB.write((byte*)&S.TimeOut, sizeof(float));
-  SerialUSB.write(S.ProtocolHistoryIndex);
-  /*
-    for (int i = 0; i < 20; i++) {
-    SerialUSB.write(S.ProtocolHistory[i].Protocol);
-    SerialUSB.write((byte*)&S.ProtocolHistory[i].nTrials, sizeof(unsigned int));
-    SerialUSB.write(S.ProtocolHistory[i].performance);
-    }
-  */
-  SerialUSB.write(S.GaveFreeReward.flag_R_water);
-  SerialUSB.write(S.GaveFreeReward.flag_L_water);
-  SerialUSB.write((byte*)&S.GaveFreeReward.past_trials, sizeof(unsigned int));
+    SerialUSB.write((byte*)&S.SamplePeriod, sizeof(float));
+    SerialUSB.write((byte*)&S.DelayPeriod, sizeof(float));
+    SerialUSB.write((byte*)&S.TimeOut, sizeof(float));
+    SerialUSB.write(S.ProtocolHistoryIndex);
+    /*
+      for (int i = 0; i < 20; i++) {
+      SerialUSB.write(S.ProtocolHistory[i].Protocol);
+      SerialUSB.write((byte*)&S.ProtocolHistory[i].nTrials, sizeof(unsigned int));
+      SerialUSB.write(S.ProtocolHistory[i].performance);
+      }
+    */
+    SerialUSB.write(S.GaveFreeReward.flag_R_water);
+    SerialUSB.write(S.GaveFreeReward.flag_L_water);
+    SerialUSB.write((byte*)&S.GaveFreeReward.past_trials, sizeof(unsigned int));
 
-  /* not necessary for PC
-    for (int i = 0; i < RECORD_TRIALS; i++) {
-  	SerialUSB.write(S.ProtocolTypeHistory[i]);
-  	SerialUSB.write(S.TrialTypeHistory[i]);
-  	SerialUSB.write(S.OutcomeHistory[i]);
-    }
-  */
+    /* not necessary for PC
+      for (int i = 0; i < RECORD_TRIALS; i++) {
+    	SerialUSB.write(S.ProtocolTypeHistory[i]);
+    	SerialUSB.write(S.TrialTypeHistory[i]);
+    	SerialUSB.write(S.OutcomeHistory[i]);
+      }
+    */
 
-  //SerialUSB.write(S.struggle_enable);
-  //SerialUSB.write((byte*)&S.totoal_reward_num, sizeof(unsigned int));
-  //SerialUSB.write(S.retract_times);
+    //SerialUSB.write(S.struggle_enable);
+    //SerialUSB.write((byte*)&S.totoal_reward_num, sizeof(unsigned int));
+    //SerialUSB.write(S.retract_times);
 
-  //interrupts();
-  return 0;
+    //interrupts();
+  }
 }
 
 int send_PC_trials_24hr() {
@@ -3297,7 +3342,9 @@ int SendStateMatrix(StateMatrix * sma) {
   byte returnVal = Serial1ReadByte();
   if (returnVal != 1) {
     // SerialUSB.print(returnVal);
-    SerialUSB.println("E: SendStateMachine failed.");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: SendStateMachine failed.");
+    }
     return -1;
   }
   return 0;
@@ -3321,7 +3368,9 @@ int RunStateMatrix() {
   byte returnVal = Serial1ReadByte();
   if ( returnVal != 1) {
     // SerialUSB.print(returnVal);
-    SerialUSB.println("E: Failed attempt to run state matrix (!= 1)");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: Failed attempt to run state matrix (!= 1)");
+    }
     return -1;
   }
   return 0;
@@ -3413,7 +3462,7 @@ byte SerialUSBReadByte() {
 }
 
 // write an unsigned long number to PC
-void SerialUSBWriteLong(unsigned long num) {
+void SerialUSBWriteLong(unsigned long num) { // NOT USED
   SerialUSB.write((byte)num);
   SerialUSB.write((byte)(num >> 8));
   SerialUSB.write((byte)(num >> 16));
@@ -3431,27 +3480,31 @@ void SerialUSBWriteShort(word num) {
 void Incase_handler() {
   Timer4.stop();
   if (Receiving_data_from_Bpod == 1) { // get struck in receiving Bpod data
-    SerialUSB.println("E: Get struck in receiving Bpod data.");
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: Get struck in receiving Bpod data.");
+    }
     // Send 'K' to Bpod to have Bpod send back many bytes to get controller out of struck
     Serial1.write('K');
   }
 }
 
 void printCurrentTime() {
-  now = rtc.now();
-  SerialUSB.print("M: ");
-  SerialUSB.print(now.year(), DEC);
-  SerialUSB.print('/');
-  SerialUSB.print(now.month(), DEC);
-  SerialUSB.print('/');
-  SerialUSB.print(now.day(), DEC);
-  SerialUSB.print(" ");
-  SerialUSB.print(now.hour(), DEC);
-  SerialUSB.print(':');
-  SerialUSB.print(now.minute(), DEC);
-  SerialUSB.print(':');
-  SerialUSB.print(now.second(), DEC);
-  SerialUSB.println();
+  if (SerialUSB.dtr() && SerialUSB_connected()) {
+    now = rtc.now();
+    SerialUSB.print("M: ");
+    SerialUSB.print(now.year(), DEC);
+    SerialUSB.print('/');
+    SerialUSB.print(now.month(), DEC);
+    SerialUSB.print('/');
+    SerialUSB.print(now.day(), DEC);
+    SerialUSB.print(" ");
+    SerialUSB.print(now.hour(), DEC);
+    SerialUSB.print(':');
+    SerialUSB.print(now.minute(), DEC);
+    SerialUSB.print(':');
+    SerialUSB.print(now.second(), DEC);
+    SerialUSB.println();
+  }
 }
 
 void handshake_with_bpod() {
@@ -3460,7 +3513,9 @@ void handshake_with_bpod() {
     Serial1.write('6'); // handshake with Bpod
     delay(100);
     while (!Serial1.available()) {
-      SerialUSB.println("E: Trying to handshake with Bpod...");
+      if (SerialUSB.dtr() && SerialUSB_connected()) {
+        SerialUSB.println("E: Trying to handshake with Bpod...");
+      }
       delay(5000);
       Serial1.write('6');
       delay(100);
@@ -3471,10 +3526,23 @@ void handshake_with_bpod() {
         Serial1.read();
       }
     } else {
-      SerialUSB.println("M: handshake successful.");
+      if (SerialUSB.dtr() && SerialUSB_connected()) {
+        SerialUSB.println("M: handshake successful.");
+      }
       ledState = HIGH;
       digitalWrite(ledPin, ledState);
       isHandshake = 1;
     }
+  }
+}
+
+byte SerialUSB_connected() {
+  // Check if the usb cable is connected with the PC
+  uint32_t Count = (UOTGHS->UOTGHS_DEVFNUM & UOTGHS_DEVFNUM_FNUM_Msk) >> UOTGHS_DEVFNUM_FNUM_Pos;
+  delay(2);
+  if (Count == (UOTGHS->UOTGHS_DEVFNUM & UOTGHS_DEVFNUM_FNUM_Msk) >> UOTGHS_DEVFNUM_FNUM_Pos) {
+    return 0;
+  } else {
+    return 1;
   }
 }
