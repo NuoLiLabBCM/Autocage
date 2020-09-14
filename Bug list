@@ -1,7 +1,4 @@
-9/10/2020
-Version 1.0
-If a cage is connect to matlab GUI. Then disconnect from the GUI and USB. Cage will be stuck. 
-When in this state, loading new programs onto SD card won’t update. The cage is completely stuck
+﻿
 
 
 
@@ -72,5 +69,10 @@ GUI saves the progress locally. GUI do not refresh when disconnecting. If connec
 the program pick up the progress from the previous box connected to GUI. Progress should be tied to the SD card, not to the board. GUI should 
 follow SD card. GUI should have NO MEMORY
     (this will be fixed in version 1.0 update)
+
+9/10/2020
+Version 1.0
+If a cage is connect to matlab GUI. Then disconnect from the GUI and USB. Cage will be stuck. 
+When in this state, loading new programs onto SD card won’t update. The cage is completely stuck
 
 
