@@ -324,7 +324,7 @@ handles.update_timer = timer('Name','MainTimer','TimerFcn',{@updateGUI},...
 start(handles.update_timer);
 
 SerialTimerInterval = 1; % every 1 second
-handles.serial_update_timer = timer('Name','SeiralTimer','TimerFcn',{@serialTimer},...
+handles.serial_update_timer = timer('Name','serialTimer','TimerFcn',{@serialTimer},...
     'Period',SerialTimerInterval,'ExecutionMode','fixedRate');
 start(handles.serial_update_timer);
 %% Callback Functions
@@ -544,13 +544,13 @@ start(handles.serial_update_timer);
             msgbox(['The COM port of Cage ', num2str(Cage_num), ' is CLOSED!']);
             return;
         else
-            selection = questdlg('Choose',...
-                'Do you want to pull data from SD card or plot data stored in Matlab?',...
-                'pull SD','plot data','plot data');
+            selection = questdlg('Do you want to pull data from SD card (need some time) or plot data stored in Matlab?',...
+                'Choose',...
+                'Pull SD','Plot data','Plot data');
             switch selection
-                case 'pull SD'
+                case 'Pull SD'
                     fwrite(handles.s{Cage_num},'A'); % Command
-                case 'plot data'
+                case 'Plot data'
                     % plot trial history data in last 24 hr (below)
                     figure,
                     subplot(3,1,1),hold on,
@@ -577,6 +577,8 @@ start(handles.serial_update_timer);
                         set(gca,'ytick',[0 1],'yticklabel',{'Right','Left'});
                         set(gca,'xtick',[current_time-1 current_time-0.75 current_time-0.5 current_time-0.25 current_time],'xticklabel',{'0','6','12','18','24'});
                         title([num2str(num_trial_24hr), ' trials in last 24-hour']);
+                    else
+                        title('No trials in last 24-hour');
                     end
                     
                     % plot weight data in last 48 hours
@@ -589,7 +591,7 @@ start(handles.serial_update_timer);
                     if ~isempty(weight_date_24)
                         weight = handles.matObj{Cage_num}.weight(weight_date_24(1):mRow,1:161);
                         [mRow2,~] = size(weight);
-                        weight_data = zeros(30,mRow2);
+                        weight_data = zeros(40,mRow2);
                         for i = 1:mRow2
                             weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
                         end
@@ -603,7 +605,7 @@ start(handles.serial_update_timer);
                         weight = handles.matObj{Cage_num}.weight(weight_date_48(1):weight_date_24(1),1:161);
                         [mRow2,~] = size(weight);
                         if mRow2 > 1
-                            weight_data = zeros(30,mRow2);
+                            weight_data = zeros(40,mRow2);
                             for i = 1:mRow2
                                 weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
                             end
@@ -618,7 +620,7 @@ start(handles.serial_update_timer);
                         weight = handles.matObj{Cage_num}.weight(weight_date_72(1):weight_date_48(1),1:161);
                         [mRow2,~] = size(weight);
                         if mRow2 > 1
-                            weight_data = zeros(30,mRow2);
+                            weight_data = zeros(40,mRow2);
                             for i = 1:mRow2
                                 weight_data(:,i) = typecast(uint8(weight(i,2:161)), 'single')';
                             end
@@ -914,7 +916,7 @@ start(handles.serial_update_timer);
                     % plot data in handles.trial_24: col1: timestamp; col2:trial_type; col3: trial_outcome
                     time_now = str2double(A(2:end-2));
                     if isempty (handles.trial_24)
-                        figure, subplot(2,1,1), title('No trial in last 24 hrs');
+                        figure, subplot(2,1,1), title('No trials in last 24 hrs');
                     else
                         timestamp = handles.trial_24(:,1);
                         trial_type = handles.trial_24(:,2);
@@ -930,12 +932,12 @@ start(handles.serial_update_timer);
                         xlim([time_now-24*3600 time_now]); ylim([-0.5 1.5]);
                         set(gca,'ytick',[0 1],'yticklabel',{'Right','Left'});
                         set(gca,'xtick',[time_now-24*3600 time_now-18*3600 time_now-12*3600 time_now-6*3600 time_now],'xticklabel',{'0','6','12','18','24'});
-                        title([num2str(timestamp), ' trials in last 24-hour']);
+                        title([num2str(numel(timestamp)), ' trials in last 24-hour']);
                     end
                     % after plot, reset
                     handles.trial_24 = [];
                 catch e
-                    disp('Serial Callback - end of receiving data and plot');
+                    disp('Serial Callback - end of receiving 24-hr data and plot');
                     disp(e);
                 end
             

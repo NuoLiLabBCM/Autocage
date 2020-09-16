@@ -1,4 +1,4 @@
-/* There are five files in the folder for each mouse, They are:
+/* There are six files in the folder for each mouse, They are:
  * PARAS.TXT:	parameters for task/trials
  * PARAF.TXT:	parameters for head-fixation
  * TRIALS.TXT:	data for each trial
