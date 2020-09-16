@@ -69,10 +69,6 @@ event_time_min = event_time_sec/60; % min
 event_id       = event(:,2);
 event_value    = event(:,3);
 
-MotorFB_advance_time            = event_time_min(event_id==5);
-MotorFB_advance_value           = event_value(event_id==5);
-MotorLR_advance_time            = event_time_min(event_id==6);
-MotorLR_advance_value           = event_value(event_id==6);
 Switch_trigger_time             = event_time_min(event_id==7);
 Fixation_time                   = event_time_min(event_id==8);
 Fixation_value                  = event_value(event_id==8);
@@ -89,18 +85,6 @@ Fixation_release_struggle_value = event_value(event_id==12)/1000;
 %% plot event data and save figure
 figure, % ('Position', get(0, 'Screensize'))
 
-% Motors
-subplot(3,1,1,'FontSize',16), hold on,
-if MotorFB_advance_time
-    plot(MotorFB_advance_time, MotorFB_advance_value,'b');
-end
-if MotorLR_advance_time
-    plot(MotorLR_advance_time, MotorLR_advance_value,'r');
-end
-% plot(Fixation_time, Fixation_value,'g');
-xlim([0,event_time_min(end)]); ylim([-1 256]);
-title('Motor Advance (blue-FB,red-LR)');
-
 % Head Fixation
 is_fixation = 1.2* ones(event_time_sec(end),1); %  resolution: sec
 for i = 1:length(Fixation_time)
@@ -115,7 +99,7 @@ for i = 1:length(Fixation_time)
         end
     end
 end
-subplot(3,1,2,'FontSize',16), hold on,
+subplot(2,1,1,'FontSize',16), hold on,
 h1 = plot(Switch_trigger_time, 4*ones(size(Switch_trigger_time)), 'b^');
 h2 = plot(Fixation_time, 3*ones(size(Fixation_time)), 'bv');
 h3 = plot(Fixation_release_timeup_time, 2*ones(size(Fixation_release_timeup_time)), 'g*');
@@ -129,7 +113,7 @@ title(['Head Fixation', ' (num: ', num2str(numel(Fixation_time)), ')']);
 set(gca,'YTick',[2 3 4],'YTickLabel',{'Release','Fixation','Trigger'});
 
 % fixation time
-subplot(3,1,3,'FontSize',16), hold on,
+subplot(2,1,2,'FontSize',16), hold on,
 h3 = stem(Fixation_release_struggle_time, Fixation_release_struggle_value,'b');
 h1 = stem(Fixation_release_timeup_time, Fixation_release_timeup_value,'g');
 % h2 = stem(Fixation_release_escape_time, Fixation_release_escape_value,'r');
