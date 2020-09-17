@@ -263,7 +263,7 @@ typedef struct {
   // Protocol type, Trial type, OutcomeHistory for recent RECORD_TRIALS=100 trials
   byte ProtocolTypeHistory[RECORD_TRIALS] = {}; // 1-5
   byte TrialTypeHistory[RECORD_TRIALS]    = {}; // 0 right; 1 left;
-  byte OutcomeHistory[RECORD_TRIALS]      = {}; // 0 error; 1 correct; 2 no response; 3 others
+  byte OutcomeHistory[RECORD_TRIALS]      = {}; // // 'Others'-3 || Reward-1 || No Response-0 || Time Out (error)-2
 
   byte struggle_enable = 1;
   unsigned int totoal_reward_num          = 1;
