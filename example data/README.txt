@@ -34,7 +34,7 @@
  *				advance: performance > 70%, fixation duration 30->60 sec
  *			19: antiBias, Delay = 1.3 sec, 15% trials with stimulation during sample/delay/response
  * Column5: Trial type: 0-right; 1-left; 2-either side
- * Column6: Trial outcome: 0-error; 1-correct; 2-no response; 3-others
+ * Column6: Trial outcome: 0-No Response; 1-Reward; 2-Time Out (error); 3-'Others'
  * Column7: Optostim flag: percentage of power (10, 30, 50, 70 100%) + stim epoch (1-stim during sample; 2-delay; 3-response)
  *			e.g., 11 means stim during sample with 10% power
  *			0 means no stimulation in this trial.
