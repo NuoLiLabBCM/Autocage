@@ -2,16 +2,7 @@
 
 
 
-8/20/2020
-Documentation of Testing should include a brief instruction on how to upload Arduino program that include the 
-following information:
-1) Where to install Arduino program
-2) install Arduino Due board from "Tool"
-3) they need to select Arduino Due, be plugged into the programing port, and select the correct PORT 
-4) The user needs to copy the provided library into the library of Arduino program.
-5) A brief instruction on how to open RealTerm and connect to the Arduino (Note that when running RealTerm, 
-   Arduino needs to be plugged into regular port, NOT programming port.
-   
+
 
 
 
@@ -75,4 +66,14 @@ Version 1.0
 If a cage is connect to matlab GUI. Then disconnect from the GUI and USB. Cage will be stuck. 
 When in this state, loading new programs onto SD card won’t update. The cage is completely stuck
 
+8/20/2020
+Documentation of Testing should include a brief instruction on how to upload Arduino program that include the 
+following information:
+1) Where to install Arduino program
+2) install Arduino Due board from "Tool"
+3) they need to select Arduino Due, be plugged into the programing port, and select the correct PORT 
+4) The user needs to copy the provided library into the library of Arduino program.
+5) A brief instruction on how to open RealTerm and connect to the Arduino (Note that when running RealTerm, 
+   Arduino needs to be plugged into regular port, NOT programming port.
+   
 
