@@ -79,7 +79,7 @@ typedef struct {
   */
   // 1-mark arduino restarted
   // 7-switchTriggered; 8-headfixation; 11-headfixation again immediately after release
-  // 9-release1:timeup; 10-release2:escape; 12-release3:struggle
+  // 9-release1:timeup; 10-release2:escape or switch off; 12-release3:struggle;
   // 20-user updating parameters from GUI
   int events_value[20]          = {0};
 } Events_fixation;
@@ -248,7 +248,7 @@ typedef struct {
   byte Autolearn               = 0;          // {"Either", "On", "antiBias", "random","off","fixed"}; 0-5
   byte TrialType               = 2;          // 0 right; 1 left; 2 either side
   int random_delay_duration    = 1001;       // ms
-  byte Trial_Outcome           = 3;          // 0 error; 1 correct; 2 no response; 3 others
+  byte Trial_Outcome           = 3;          // 'Others'-3 || Reward-1 || No Response-0 || Time Out (error)-2
   /////////////////////////////////////////////////
 
   float SamplePeriod        = 1.30; //
@@ -639,7 +639,7 @@ void loop() {
       if (headfixation_flag == 1) { // release head-fixation
         analogWrite(DAC0, regulatorVal_release);
         headfixation_flag = 0;
-        Ev.events_id[Ev.events_num] = 10; // headfixation release2: escape
+        Ev.events_id[Ev.events_num] = 10; // headfixation release2: switch off release
         Ev.events_time[Ev.events_num] = millis();
         Ev.events_value[Ev.events_num] = millis() - last_state_time;
         Ev.events_num ++;
@@ -784,7 +784,7 @@ void loop() {
         F.struggle_thres_pos = buffer_tmp.toInt();
         write_SD_para_F();
         break;
-      case 'A': // not used
+      case 'A': //
         send_PC_trials_24hr();
         break;
       default: // never happen...
@@ -1283,10 +1283,10 @@ int Read_Data_from_Bpod() {
     }
   } else { // error reading Bpod data...
     //SerialUSB.println(opCode);
-    delay(1000);
-    while (Serial1.available()) {
-      Serial1.read(); // clear serial1 dirty data
-    }
+    //delay(1000);
+    //while (Serial1.available()) {
+      //Serial1.read(); // clear serial1 dirty data
+    //}
     nEvents = 0; nTransition = 0;
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: Receiving Bpod Data Error...");
@@ -1498,7 +1498,7 @@ int UpdatePerformance() {
   for (int i = 0; i < RECORD_TRIALS - 1; i++) {
     S.ProtocolTypeHistory[i] = S.ProtocolTypeHistory[i + 1];
     S.TrialTypeHistory[i]    = S.TrialTypeHistory[i + 1]; // 0 right; 1 left;
-    S.OutcomeHistory[i]      = S.OutcomeHistory[i + 1];         // 0 error; 1 correct; 2 no response; 3 others
+    S.OutcomeHistory[i]      = S.OutcomeHistory[i + 1];         // 'Others'-3 || Reward-1 || No Response-0 || Time Out (error)-2
   }
   // Keep record current trial info in the last position (RECORD_TRIALS-1) of the matrix
   S.ProtocolTypeHistory[RECORD_TRIALS - 1] = S.ProtocolType;
@@ -1905,7 +1905,7 @@ void autoAdjustLickportPosition() {
   if (S.ProtocolHistoryIndex > 2 && S.ProtocolHistoryIndex <= 19) { //
     LickPortMove++;
     if (LickPortMove > 50) {
-      byte recent1 = 50; // last 50 trials are biased 60% vs. 40%
+      byte recent1 = 50; // last 50 trials are biased 30%
       byte correct_R_history = compare_array_sum(S.OutcomeHistory, 1, S.TrialTypeHistory, 0, RECORD_TRIALS - recent1, RECORD_TRIALS);
       byte correct_L_history = compare_array_sum(S.OutcomeHistory, 1, S.TrialTypeHistory, 1, RECORD_TRIALS - recent1, RECORD_TRIALS);
       byte trial_R_num = compare_array_sum(S.TrialTypeHistory, 0, RECORD_TRIALS - recent1, RECORD_TRIALS);
@@ -1924,7 +1924,7 @@ void autoAdjustLickportPosition() {
       }
       boolean condition1 = abs(Perf_R - Perf_L) > 0.3;
 
-      byte recent2 = 20; // or, 90% vs. 10% in the last 20 trials
+      byte recent2 = 20; // in the last 20 trials, bias >= 80%
       correct_R_history = compare_array_sum(S.OutcomeHistory, 1, S.TrialTypeHistory, 0, RECORD_TRIALS - recent2, RECORD_TRIALS);
       correct_L_history = compare_array_sum(S.OutcomeHistory, 1, S.TrialTypeHistory, 1, RECORD_TRIALS - recent2, RECORD_TRIALS);
       trial_R_num = compare_array_sum(S.TrialTypeHistory, 0, RECORD_TRIALS - recent2, RECORD_TRIALS);
