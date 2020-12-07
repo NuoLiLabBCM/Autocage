@@ -1,9 +1,4 @@
-﻿10/6/2020
-
-1)The version 1.0 system run for a few hours and stopped running. 
-2)When clicking "close" button in HomeCage_GUI to close the COM port, sometime Matlab was not responding (stuck).
-User has to reset the Arduino_Master in order to get out of the above issues.
-it seems that the issues are casued by the commuication between PC and arduino.
+﻿
 
 
 
@@ -74,3 +69,9 @@ following information:
    Arduino needs to be plugged into regular port, NOT programming port.
    
 
+10/6/2020
+
+1)The version 1.0 system run for a few hours and stopped running. 
+2)When clicking "close" button in HomeCage_GUI to close the COM port, sometime Matlab was not responding (stuck).
+User has to reset the Arduino_Master in order to get out of the above issues.
+it seems that the issues are casued by the commuication between PC and arduino.

@@ -206,9 +206,9 @@ void setup() {
 
 void loop() {
 	// Check connection
-	if (connectionState == 0) {
+	/* if (connectionState == 0) {
 		updateStatusLED(1); // BLINK: waiting for connection
-	}
+	} */
 
 	if (Serial1.available() > 0) {
 		CommandByte = Serial1.read();  // P for Program, R for Run, O for Override, 6 for Device ID

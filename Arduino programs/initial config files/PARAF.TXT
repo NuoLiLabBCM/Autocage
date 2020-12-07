@@ -7,3 +7,4 @@ struggle_thres_pos = 32
 last_advance_threshold_counter = 0
 headfixation_counter = 0
 fixation_interval_max = 30000
+weight_offset = 0
