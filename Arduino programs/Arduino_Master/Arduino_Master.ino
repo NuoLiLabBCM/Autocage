@@ -339,6 +339,8 @@ byte ForthByte;
 String buffer_tmp;
 unsigned long unix_time_24;
 
+bool isStruck = 0;
+
 //watchdog
 int watchdogTime = 10000;  //10s
 
@@ -353,7 +355,8 @@ void watchdogSetup(void)
 /****************************************************************************************************/
 
 void setup() {
-
+  isStruck = 0;
+	
   watchdogEnable(watchdogTime);
   
   SerialUSB.begin(115200);   // To PC for debug info and/or Data
@@ -1355,6 +1358,13 @@ int Read_Data_from_Bpod() {
       SerialUSB.println("E: Receiving Bpod Data Error...");
     }
   }
+  
+  if (isStruck ==1) {
+	isStruck = 0;
+	if (SerialUSB.dtr() && SerialUSB_connected()) {
+		SerialUSB.println("E: Get struck in receiving Bpod data.");
+	}
+  }
 
   if (Serial1.available()) {
     delay(1000);
@@ -1362,10 +1372,9 @@ int Read_Data_from_Bpod() {
       Serial1.read(); // clear serial1 dirty data
     }
   }
-
+  
   Receiving_data_from_Bpod = 0;
   Timer4.stop(); // in case of get struck in receiving data
-
   /*
     // And send to PC. fast < 10 ms
     //unsigned long startMillis = millis();
@@ -3562,10 +3571,8 @@ void SerialUSBWriteShort(word num) {
 
 void Incase_handler() {
   Timer4.stop();
+  isStruck = 1;
   if (Receiving_data_from_Bpod == 1) { // get struck in receiving Bpod data
-    if (SerialUSB.dtr() && SerialUSB_connected()) {
-      SerialUSB.println("E: Get struck in receiving Bpod data.");
-    }
     // Send 'K' to Bpod to have Bpod send back many bytes to get controller out of struck
     Serial1.write('K');
   }

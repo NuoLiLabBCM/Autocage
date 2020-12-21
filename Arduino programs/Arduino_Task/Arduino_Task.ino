@@ -194,7 +194,7 @@ void setup() {
 	//pinMode(BlueLEDPin, OUTPUT);
 
 	Serial1.begin(115200);
-	SerialUSB.begin(115200);
+	//SerialUSB.begin(115200);
 	//SPI.begin();
 	SetWireOutputLines(0);
 	SetBNCOutputLines(0);
