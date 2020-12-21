@@ -77,7 +77,7 @@ byte laserByte = 1; // 1-using thorlab laser; 2-using Ultra laser
 byte led_state = LOW;
 
 void setup() {
-  SerialUSB.begin(115200);
+  //SerialUSB.begin(115200);
 
   Serial2.begin(115200);     // To Bpod
   while (Serial2.available()) {
@@ -126,8 +126,8 @@ void loop() {
     powerWeight = (float)weightByte / 100;
     while(Serial2.available()==0){};
     laserByte = Serial2.read();
-    SerialUSB.println(weightByte);
-    SerialUSB.println(laserByte);
+    //SerialUSB.println(weightByte);
+    //SerialUSB.println(laserByte);
   }
 }
 
