@@ -50,8 +50,8 @@ byte PortPWMOutputLines[8] = {53, 8, 7, 6, 5, 4, 3, 2}; // pwm1: gocue; pwm2-8: 
 //PWMH2_PB14 // PWM_CH2 pin53
 using namespace arduino_due::pwm_lib;
 // for go cue sound
-#define PWM_PERIOD_PIN_53 28600 // 3.5 kHz        //10000 // 100 us, 10 kHz
-#define PWM_DUTY_PIN_53   14300 // 50% duty
+#define PWM_PERIOD_PIN_53 27000 //3.7khz    //28600 // 3.5 kHz        //10000 // 100 us, 10 kHz
+#define PWM_DUTY_PIN_53   13500             //14300 // 50% duty
 // defining pwm object using pin 35, pin PC3 mapped to pin 35 on the DUE
 // this object uses PWM channel 0
 pwm<pwm_pin::PWMH2_PB14> pwm_pin53;
