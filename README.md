@@ -1,5 +1,5 @@
 # Autocage
-System for fully autonomous mouse behavioral and optogenetic experiments in home-cage
+A home-cage system for fully autonomous mouse behavioral and optogenetic experiments
 ## Features
 - Automated home-cage training in challenging decision-making tasks with voluntary head-fixation
 - Unsupervised optogenetic experiment to survey brain regions involved in behavior
