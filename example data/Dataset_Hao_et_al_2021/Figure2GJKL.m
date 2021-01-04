@@ -1,5 +1,5 @@
 %% for figure 2
-load autocage_fixation.mat
+load autocage_fixation.mat % fixation_all
 
 figure,
 mouse_num = 37;
