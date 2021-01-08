@@ -96,7 +96,7 @@ Events_fixation Ev;
 
 // weight stage related init
 HX711 scale(portWeight_DOUT, portWeight_CLK);
-float calibration_factor = -12400;
+float calibration_factor = -12300; // by default -12300.
 float weighting_info[40] = {0}; // weighting info in last 2 sec
 int weight_counter       = 0;
 long weight_offset    = 0;
