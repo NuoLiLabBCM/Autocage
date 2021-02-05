@@ -10,7 +10,7 @@ A home-cage system for fully autonomous mouse behavioral and optogenetic experim
 <img src="https://github.com/NuoLiLabBCM/Autocage/blob/master/Design%20files/media/fig1c.png" width="603" height="360" />
 
 ## Citation
-Hao, Thomas, and Li. (2020) Fully autonomous mouse behavioral and optogenetic experiments in home-cage
+Hao, Thomas, and Li. (2020) Fully autonomous mouse behavioral and optogenetic experiments in home-cage. https://doi.org/10.1101/2020.12.27.424480 
 
 ## Contact
 Further information and requests should be directed to and will be fulfilled by the Lead Contact, Nuo Li (nuol@bcm.edu)
