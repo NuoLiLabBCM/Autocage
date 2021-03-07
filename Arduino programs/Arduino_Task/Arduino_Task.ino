@@ -490,6 +490,7 @@ void loop() {
 		for (int x = 0; x < nEvents; x++) {
 			Serial1.write(Events[x]); // new
 			Serial1WriteLong(TimeStamps[x]);
+			delayMicroseconds(50);
 		}
 		//SerialUSB.println(nTransition);
 		Serial1WriteShort(nTransition);
