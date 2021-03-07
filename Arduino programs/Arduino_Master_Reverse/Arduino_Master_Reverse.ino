@@ -1,10 +1,10 @@
-/* 
-Reverse Contingency Task for v1.0
+/*
+  Reverse Contingency Task for v1.0
 
-Training will stay in protocol 4 (sample) and reverse contingency once perf > 80%
+  Training will stay in protocol 4 (sample) and reverse contingency once perf > 80%
 
-ParaS file need to append contingency (byte) and contingency_trial (unsigned int)
-trial.txt file include contingency and contingency_trial
+  ParaS file need to append contingency (byte) and contingency_trial (unsigned int)
+  trial.txt file include contingency and contingency_trial
 
 */
 
@@ -96,9 +96,9 @@ typedef struct {
   // 15-arduino switch on && SD card inserted;
   // 16-arduino switch off or SD card not inserted;
   // 20-user updating parameters from GUI: portMotorFB;
-  // 21-user updating parameters from GUI: portMotorLR; 
-  // 22-user updating parameters from GUI: portMotorFB_final;   
-  
+  // 21-user updating parameters from GUI: portMotorLR;
+  // 22-user updating parameters from GUI: portMotorFB_final;
+
   int events_value[20]          = {0};
 } Events_fixation;
 
@@ -359,7 +359,7 @@ int watchdogTime = 10000;  //10s
 
 void watchdogSetup(void)
 {
-// do what you want here
+  // do what you want here
 }
 
 
@@ -369,9 +369,9 @@ void watchdogSetup(void)
 
 void setup() {
   isStruck = 0;
-	
+
   watchdogEnable(watchdogTime);
-  
+
   SerialUSB.begin(115200);   // To PC for debug info and/or Data
 
   Serial1.begin(115200);     // To Bpod
@@ -394,7 +394,7 @@ void setup() {
   SwitchL_LastStatus = digitalReadDirect(portSwitchL);
   pinMode(portSwitchR, INPUT_PULLUP);
   SwitchR_LastStatus = digitalReadDirect(portSwitchR);
- 
+
   pinMode(portMotorLR, OUTPUT);
   pinMode(portMotorFB, OUTPUT);
   pinMode(portMotorPole, OUTPUT);
@@ -407,12 +407,12 @@ void setup() {
 
   // Check if SD Card is working...
   if (digitalReadDirect(portSD) == 1) {
-	sdcard = 0;
+    sdcard = 0;
     SerialUSB.println("E: SD Card not inserted...0");
   } else {
-	sdcard = 1;
+    sdcard = 1;
     SD.begin(chipSelect);
-	read_SD_para_F();   // 4 ms
+    read_SD_para_F();   // 4 ms
     read_SD_para_S();
     SerialUSB.println("M: SD card detected!");
   }
@@ -477,7 +477,7 @@ void setup() {
 
   // Handshake with Bpod; get stuck and keep trying if failed
   handshake_with_bpod();
-  
+
   Timer4.attachInterrupt(Incase_handler); // in case receiving Bpod data struck
   Timer4.setPeriod(5000000); // Runs  5 sec later to check if get struck
 
@@ -486,7 +486,7 @@ void setup() {
   } else {
     paused = 1;
   }
-  
+
 }
 
 
@@ -494,30 +494,30 @@ void setup() {
 /********************************************** Loop() **********************************************/
 /****************************************************************************************************/
 void loop() {
-	
-	watchdogReset();
-	
-	if (digitalReadDirect(portSD) == 0){
-		if (sdcard ==0){
-			sdcard =1;
-			SD.begin(chipSelect);
-		}
-	}else{
-		if (sdcard ==1){
-			sdcard=0;
-			if (SerialUSB.dtr() && SerialUSB_connected()) {
-				SerialUSB.println("E: SD Card not inserted...1");
-			}
-		}
-	}	
+
+  watchdogReset();
+
+  if (digitalReadDirect(portSD) == 0) {
+    if (sdcard == 0) {
+      sdcard = 1;
+      SD.begin(chipSelect);
+    }
+  } else {
+    if (sdcard == 1) {
+      sdcard = 0;
+      if (SerialUSB.dtr() && SerialUSB_connected()) {
+        SerialUSB.println("E: SD Card not inserted...1");
+      }
+    }
+  }
 
   // if (Rocker_switch is ON && SD card inserted), run the state matrix
   if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0) {
 
     if (paused == 1) {
       paused = 0;
-	  
-	  Ev.events_id[Ev.events_num] = 15; //switch on
+
+      Ev.events_id[Ev.events_num] = 15; //switch on
       Ev.events_time[Ev.events_num] = millis();
       Ev.events_value[Ev.events_num] = -1;
       Ev.events_num ++;
@@ -544,19 +544,19 @@ void loop() {
       valve_control(3); //  open valve 1 and 2
       delay(100);
       valve_control(0); // close valve 1 and 2
-	  
-	  timer_state = CHECK_TRIG;
+
+      timer_state = CHECK_TRIG;
     }
 
-    if (protocol_sent == 0) {		
+    if (protocol_sent == 0) {
       if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > S.FB_final_position) {
         send_protocol_to_Bpod_and_Run(); //49 ms - 96 ms
       } else if (headfixation_flag == 1) { // need check if head is fixed
-       send_protocol_to_Bpod_and_Run();
+        send_protocol_to_Bpod_and_Run();
       }
     }
 
-    if (Serial1.available()) { // receiving data from Bpod (i.e., a trial is done)		
+    if (Serial1.available()) { // receiving data from Bpod (i.e., a trial is done)
       // Read data from Bpod, Write events to SD card, Update trial outcome
       Read_Data_from_Bpod(); // 5-100 ms (30% writ to SD card) depending how many data
 
@@ -631,7 +631,7 @@ void loop() {
       weight_tmp = scale.get_units(); // 165 us
       last_weight_read_time = millis();
       if (weight_tmp > 10 && weight_tmp < 40 && headfixation_flag == 0) { // avoid record many zeros
-		weighting_info[weight_counter] = weight_tmp;
+        weighting_info[weight_counter] = weight_tmp;
         weight_counter++;
       }
       if (weight_counter >= 40) { // have 2-sec data in the array
@@ -668,21 +668,21 @@ void loop() {
 
     SwitchL_CurrentStatus   = digitalReadDirect(portSwitchL);
     SwitchR_CurrentStatus   = digitalReadDirect(portSwitchR);
-	
+
     // State Machine for the Head-fixation
     switch_fixation_state();
 
     SwitchL_LastStatus = SwitchL_CurrentStatus;
     SwitchR_LastStatus = SwitchR_CurrentStatus;
-	
+
     // detection of release event => free water to lure next fixation
     if (headfixation_flag == 0 && last_headfixation_flag == 1 && F.fixation_duration < 15000) {
       // free reward to fill the lickport tube
       valve_control(3); //  open valve 1 and 2
       delay(40);
       valve_control(0); // close valve 1 and 2
-	  
-	  Ev.events_id[Ev.events_num] = 14; //  free reward to lure next fixation
+
+      Ev.events_id[Ev.events_num] = 14; //  free reward to lure next fixation
       Ev.events_time[Ev.events_num] = millis();
       Ev.events_value[Ev.events_num] = 40;
       Ev.events_num ++;
@@ -712,18 +712,18 @@ void loop() {
         Ev.events_time[Ev.events_num] = millis();
         Ev.events_value[Ev.events_num] = millis() - last_state_time;
         Ev.events_num ++;
-		if (sdcard ==1){
-			write_SD_event_fixation();
-		}
+        if (sdcard == 1) {
+          write_SD_event_fixation();
+        }
         Ev.events_num = 0;
         timer_state = CHECK_TRIG;
       }
-	  
-	  Ev.events_id[Ev.events_num] = 16; //switch off
+
+      Ev.events_id[Ev.events_num] = 16; //switch off
       Ev.events_time[Ev.events_num] = millis();
       Ev.events_value[Ev.events_num] = -1;
       Ev.events_num ++;
-	  	  
+
       // stop the trial
       if (protocol_sent == 1) {
         protocol_sent = 0;
@@ -852,9 +852,9 @@ void loop() {
       case 'T': //tare the scale to 0
         scale.set_scale();
         scale.tare();  //Reset the scale to 0
-		weight_offset = scale.get_offset();
+        weight_offset = scale.get_offset();
         scale.set_scale(calibration_factor);
-		write_SD_para_F();
+        write_SD_para_F();
         break;
       case 'S': //set Struggle threshold
         buffer_tmp = SerialUSB.readStringUntil('\n');
@@ -940,7 +940,7 @@ int send_protocol_to_Bpod_and_Run() {
         states[2]  = CreateState("DelayPeriod",       S.DelayPeriod,            1, DelayPeriod_Cond,     0, NoOutput);
         states[3]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     1, ResponseCue_Output);
         states[4]  = CreateState("AnswerPeriod",      3600,                     3, AnswerPeriod_Cond,    0, NoOutput);
-		states[5]  = CreateState("RewardL",           S.reward_left,            1, RewardL_Cond,         1, RewardL_Output);
+        states[5]  = CreateState("RewardL",           S.reward_left,            1, RewardL_Cond,         1, RewardL_Output);
         states[6]  = CreateState("RewardR",           S.reward_right,           1, RewardR_Cond,         1, RewardR_Output);
         states[7]  = CreateState("RewardConsumption", ConsumptionPeriod,        1, Tup_EndTrial_Cond,    0, NoOutput); //0.75
         states[8]  = CreateState("NoResponse",        0.002,                    1, Tup_EndTrial_Cond,    0, NoOutput);
@@ -1372,19 +1372,19 @@ int Read_Data_from_Bpod() {
     //SerialUSB.println(opCode);
     //delay(1000);
     //while (Serial1.available()) {
-      //Serial1.read(); // clear serial1 dirty data
+    //Serial1.read(); // clear serial1 dirty data
     //}
     nEvents = 0; nTransition = 0;
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: Receiving Bpod Data Error...");
     }
   }
-  
-  if (isStruck ==1) {
-	isStruck = 0;
-	if (SerialUSB.dtr() && SerialUSB_connected()) {
-		SerialUSB.println("E: Get struck in receiving Bpod data.");
-	}
+
+  if (isStruck == 1) {
+    isStruck = 0;
+    if (SerialUSB.dtr() && SerialUSB_connected()) {
+      SerialUSB.println("E: Get struck in receiving Bpod data.");
+    }
   }
 
   if (Serial1.available()) {
@@ -1393,7 +1393,7 @@ int Read_Data_from_Bpod() {
       Serial1.read(); // clear serial1 dirty data
     }
   }
-  
+
   Receiving_data_from_Bpod = 0;
   Timer4.stop(); // in case of get struck in receiving data
   /*
@@ -1786,7 +1786,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
         S.SamplePeriod        = 1.30;
         S.DelayPeriod         = 0.3;   // in sec
-        S.TimeOut             = 2.00;
+        S.TimeOut             = 3.00;
         S.Autolearn = 2; // antiBias
       }
       break;
@@ -1803,7 +1803,7 @@ int autoChangeProtocol() {
         S.TimeOut             = 4.0;
         S.Autolearn           = 2;     // antiBias
       }
-	  contingency_trial = contingency_trial + 1;
+      contingency_trial = contingency_trial + 1;
       SerialUSB.print("M: contingency: ");
       SerialUSB.print(contingency);
       SerialUSB.print("; contingency_trial: ");
@@ -2297,7 +2297,7 @@ int trialSelection() {
 void switch_fixation_state() {
   switch (timer_state) {
     case CHECK_TRIG:
-		if (SwitchL_CurrentStatus == 0 && SwitchR_CurrentStatus == 0 && (SwitchL_LastStatus == 1 || SwitchR_LastStatus == 1 )) {
+      if (SwitchL_CurrentStatus == 0 && SwitchR_CurrentStatus == 0 && (SwitchL_LastStatus == 1 || SwitchR_LastStatus == 1 )) {
         // switch triggered
         F.trig_counter++;
         para_F_changed = 1;
@@ -2307,12 +2307,12 @@ void switch_fixation_state() {
         Ev.events_value[Ev.events_num] = -1;
         Ev.events_num ++;
         if (SerialUSB.dtr() && SerialUSB_connected()) {
-		  SerialUSB.print("M: Switch status: ");
-		  SerialUSB.print(SwitchL_CurrentStatus);
-		  SerialUSB.print(SwitchR_CurrentStatus);
-		  SerialUSB.print(SwitchL_LastStatus);
-		  SerialUSB.print(SwitchR_LastStatus);
-		  SerialUSB.print("M: Switch triggered NO. ");
+          SerialUSB.print("M: Switch status: ");
+          SerialUSB.print(SwitchL_CurrentStatus);
+          SerialUSB.print(SwitchR_CurrentStatus);
+          SerialUSB.print(SwitchL_LastStatus);
+          SerialUSB.print(SwitchR_LastStatus);
+          SerialUSB.print("M: Switch triggered NO. ");
           SerialUSB.println(F.trig_counter);
         }
         if (F.trig_counter > trigger_num_before_fix && S.FB_motor_position <= S.FB_final_position) {
@@ -2320,9 +2320,9 @@ void switch_fixation_state() {
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("DELAY_TO_FIX");
           last_state_time = millis();
-        }else{
-			timer_state = CHECK_RELEASE0;
-		}			
+        } else {
+          timer_state = CHECK_RELEASE0;
+        }
       }
       break;
 
@@ -2602,7 +2602,7 @@ void switch_fixation_state() {
       break;
 
     case TIMEUP_DELAY_1000: // delay some time to see if the switch is still pressed, if so, head fixation again!
-      if (millis() - last_state_time > 1000) {		  
+      if (millis() - last_state_time > 1000) {
         // determine if advance parameter (performance based)
         if (F.fixation_duration < F.fixation_interval_max && compare_array_sum(F.Fixation_Outcome, 9, 0, 20) >= 12 && F.headfixation_counter - F.last_advance_headfixation_counter >= fixation_advance_step) {
           // performance > 60%; increasing fixation duration
@@ -2622,18 +2622,18 @@ void switch_fixation_state() {
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("HEAD_FIXATION");
         } else {
-			timer_state = CHECK_TRIG;
+          timer_state = CHECK_TRIG;
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("CHECK_TRIG");
         }
       }
       break;
-	  
-	case CHECK_RELEASE0:
-		if (SwitchL_CurrentStatus == 1 && SwitchR_CurrentStatus == 1 && (SwitchL_LastStatus == 0 || SwitchR_LastStatus == 0 )){
-			timer_state = CHECK_TRIG;
-		}
-		break;	
+
+    case CHECK_RELEASE0:
+      if (SwitchL_CurrentStatus == 1 && SwitchR_CurrentStatus == 1 && (SwitchL_LastStatus == 0 || SwitchR_LastStatus == 0 )) {
+        timer_state = CHECK_TRIG;
+      }
+      break;
     default:
       break;
   }
@@ -2670,8 +2670,8 @@ int write_SD_para_F() {
     dataFile.println(F.headfixation_counter);
     dataFile.print("fixation_interval_max = ");
     dataFile.println(F.fixation_interval_max);
-	
-	dataFile.print("weight_offset = ");
+
+    dataFile.print("weight_offset = ");
     dataFile.println(weight_offset);
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
@@ -2720,8 +2720,8 @@ int read_SD_para_F() {
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     F.fixation_interval_max = buffer_tmp.toInt();
-	
-	buffer_tmp = dataFile.readStringUntil('=');
+
+    buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     weight_offset = buffer_tmp.toInt();
   } else {
@@ -2828,8 +2828,8 @@ int write_SD_para_S() {
     dataFile.println(S.reward_left);
     dataFile.print("reward_right = ");
     dataFile.println(S.reward_right);
-	
-	dataFile.print("contingency = ");
+
+    dataFile.print("contingency = ");
     dataFile.println(contingency);
     dataFile.print("contingency_trial = ");
     dataFile.println(contingency_trial);
@@ -2962,12 +2962,12 @@ int read_SD_para_S() {
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     S.reward_right = buffer_tmp.toFloat();
-	
-	buffer_tmp = dataFile.readStringUntil('=');
+
+    buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     contingency = buffer_tmp.toInt();
-	
-	buffer_tmp = dataFile.readStringUntil('=');
+
+    buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     contingency_trial = buffer_tmp.toInt();
   } else {
@@ -3036,8 +3036,8 @@ int write_SD_trial_info() {
     dataFile.print(S.FB_motor_position);
     dataFile.print(" ");
     dataFile.print(S.LR_motor_position);
-	
-	dataFile.print(" ");
+
+    dataFile.print(" ");
     dataFile.print(contingency);
     dataFile.print(" ");
     dataFile.print(contingency_trial);
@@ -3661,7 +3661,7 @@ void printCurrentTime() {
 void handshake_with_bpod() {
   int isHandshake = 0;
   while (!isHandshake) {
-	watchdogReset();
+    watchdogReset();
     Serial1.write('6'); // handshake with Bpod
     delay(100);
     while (!Serial1.available()) {
