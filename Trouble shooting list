@@ -1,7 +1,7 @@
 ﻿4/23/2021 
 
-On day 1 of a new mouse in autocage, sometimes protocol number unusually jumps from 0 to 3 after few trials, sometimes accompanied by motor retraction issue.
-This happened once when the white button in wave board was accidentally touched by air tube. It also happend several times with no obivous reasons.
+On day 1 of a new mouse in autocage, protocol number jumps unusually from 0 to 3 after few trials, sometimes accompanied by motor retraction issue.
+This happened once when the white button in wave board was accidentally touched by air tube. In other cases, there appeared no obivous reasons.
 Fixing often need redo protocol burning to Arduino master card and copying of initial files to SD cards.
 
 Only <100 trials per day, especially during day2 to day7 in autocage.
