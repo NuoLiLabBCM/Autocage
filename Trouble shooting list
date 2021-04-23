@@ -1,6 +1,28 @@
-﻿
+﻿4/23/2021 
+A series of empty circles in a row in homecage GUI (not those programmed empty circles showing up hourly before headfixation stage) - no licking detection. 
+This is sometimes due to the default setting of maximum resistance on lickometer(s). Lower resistance usually fixes the problem (counterclock wise).
+Also check that the battery voltage is >8 volt.
 
+Mice could develop strong bias during learning even both lickports dispense similar amount of water, which can't be corrected by programms in time.
+Try moving lickports back to center of lickports (70 by default).
 
+On day 1 of a new mouse in autocage, sometimes protocol number unusually jumps from 0 to 3 after few trials, sometimes accompanied by motor retraction issue.
+This happened once wehn the white button in wave board was accidentally touched by air tube.
+Fixing often need redo protocol burning to Arduino master card and copying of initial files to SD cards.
+
+SD card read/write errors in "error message" box.
+There is a slide switch along the side of SD cards. Repeated removal/insertion of SDs could lead to misalignment of the switch. 
+Make sure the switch is pushed to the end of slot to fully "unlocked" state.
+It's a good habit to click "set&reward" whenever a SD card is moved or a new mouse is started. An error message would show up if something is wrong.
+
+Only <100 trials per day, especially during day2 to day7 in autocage.
+Some mice might be more timid than others. The pole movement might scare these mice away. If common possibilities were excluded (e.g. lickport positions are
+appropriate, Manual 5.7; motor is working well Manual 6.2), one may consider stop pole movement (turn off air regulator) for one or two days. Once mice get
+used to head fixtion, the pole could be brought back (see cage8, mouse id WY378).
+
+During analysis, the first date when a new mouse starts might be wrong.
+This is likely due to failure to reset the Arduino board on the day1. In this case, the date of 1st trial (Trials.txt) could be used to replace
+the first date in Events.TXT.
 
 
 ====================== Resolved =============================
