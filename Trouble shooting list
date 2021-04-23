@@ -7,7 +7,7 @@ Mice could develop strong bias during learning even both lickports dispense simi
 Try moving lickports back to center of lickports (70 by default).
 
 On day 1 of a new mouse in autocage, sometimes protocol number unusually jumps from 0 to 3 after few trials, sometimes accompanied by motor retraction issue.
-This happened once wehn the white button in wave board was accidentally touched by air tube.
+This happened once when the white button in wave board was accidentally touched by air tube.
 Fixing often need redo protocol burning to Arduino master card and copying of initial files to SD cards.
 
 SD card read/write errors in "error message" box.
