@@ -1,13 +1,13 @@
 ﻿4/23/2021 
 
 On day 1 of a new mouse in autocage, protocol number jumps unusually from 0 to 3 after few trials, sometimes accompanied by motor retraction issue.
-This happened once when the white button in wave board was accidentally touched by air tube. In other cases, there appeared no obivous reasons.
+This happened once when the white button in wave board was accidentally touched by air tube. In other cases, no obivous reasons were identified yet.
 Fixing often need redo protocol burning to Arduino master card and copying of initial files to SD cards.
 
 Only <100 trials per day, especially during day2 to day7 in autocage.
 Some mice might be more timid than others. The pole movement might scare these mice away. If common possibilities were excluded (e.g. lickport positions are
-appropriate, Manual 5.7; motor is working well Manual 6.2), one may consider stop pole movement (turn off air regulator) for one or two days. Once mice get
-used to head fixtion, the pole could be brought back (see cage8, mouse id WY378). But this is still an ongoing problem.
+inappropriate, Manual 5.7; there's mechnical glitch on motors Manual 6.2), one may consider stop pole movement (turn off manual air regulator) for one or two days.
+Once mice get used to head fixtion, the pole could be brought back (see cage8, mouse id WY378). But this is still an ongoing problem.
 
 
 
