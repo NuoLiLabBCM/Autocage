@@ -1,11 +1,11 @@
 ﻿4/23/2021 
 
-On day 1 of a new mouse in autocage, protocol number jumps unusually from 0 to 3 after few trials, sometimes accompanied by motor retraction issue.
-This happened once when a white button in the wave board was accidentally touched by an air tube. In several other cases, no obivous reasons were identified yet.
-Fixing often need redo protocol burning to Arduino master card and copying of initial files to SD cards.
+Matlab crashes on a regular basis (~10 days).
 
-Only <100 trials per day, especially during day2 to day7 in autocage.
-Some mice might be more timid than others. The pole movement might scare these mice away. If common possibilities were excluded (e.g. lickport positions are
+Only <100 trials per day, especially during day2 to day7 in autocage. This is likely due to:
+1) Mice experience struggles during headfixation, especially during withdrawl from the headport. Headbar may get stuck due to bad exit angle.
+Mice might suffer from bad memory and are reluctant to re-enter headports.
+2) Some mice might be more timid than others. The pole movement might scare these mice away. If common possibilities were excluded (e.g. lickport positions are
 inappropriate, Manual 5.7; there's mechnical glitch on motors Manual 6.2), one may consider stop pole movement (turn off manual air regulator) for one or two days.
 Once mice get used to head fixtion, the pole could be brought back (see cage8, mouse id WY378). But this is still an ongoing problem. Other reasons need to be
 identified. Optimization of training protocol might be needed (e.g. introduce pole when headfixation is robust).
