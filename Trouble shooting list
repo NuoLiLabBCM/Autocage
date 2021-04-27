@@ -7,7 +7,8 @@ Fixing often need redo protocol burning to Arduino master card and copying of in
 Only <100 trials per day, especially during day2 to day7 in autocage.
 Some mice might be more timid than others. The pole movement might scare these mice away. If common possibilities were excluded (e.g. lickport positions are
 inappropriate, Manual 5.7; there's mechnical glitch on motors Manual 6.2), one may consider stop pole movement (turn off manual air regulator) for one or two days.
-Once mice get used to head fixtion, the pole could be brought back (see cage8, mouse id WY378). But this is still an ongoing problem.
+Once mice get used to head fixtion, the pole could be brought back (see cage8, mouse id WY378). But this is still an ongoing problem. Other reasons need to be
+identified. Optimization of training protocol might be needed (e.g. introduce pole when headfixation is robust).
 
 
 
@@ -28,8 +29,8 @@ Make sure the switch is pushed to the end of slot to fully "unlocked" state.
 It's a good habit to click "set&reward" whenever a SD card is moved or a new mouse is started. An error message would show up if something is wrong.
 
 During analysis, the first date when a new mouse starts might be wrong.
-This is likely due to failure to reset the Arduino board on the day1. In this case, the date of 1st trial (Trials.txt) could be used to replace
-the first date in Events.TXT.
+This is likely due to failure to reset the Arduino master card on the day1. In this case, the date of 1st trial (Trials.txt) could be used to replace
+the first date in Events.TXT. Going forward, reset Arduino master card when starting a new mouse. Use the Unix time of first row in Events.txt as starting time.
 
 8/20/2020
 Without SD card, the system is running some sort of statemachine. It should be stationary
