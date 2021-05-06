@@ -1,14 +1,6 @@
 ﻿4/23/2021 
 
-Matlab crashes on a regular basis (~10 days). Jing is trying some of her ideas and the result is under active monitoring.
-
-Only <100 trials per day, especially during day2 to day7 in autocage. This is likely due to:
-1) Mice experience struggles during headfixation, especially during withdrawl from the headport. Headbar may get stuck due to bad exit angle.
-Mice might suffer from bad memory and are reluctant to re-enter headports.
-2) Some mice might be more timid than others. The pole movement might scare these mice away. If common possibilities were excluded (e.g. lickport positions are
-inappropriate, Manual 5.7; there's mechnical glitch on motors Manual 6.2), one may consider stop pole movement (turn off manual air regulator) for one or two days.
-Once mice get used to head fixtion, the pole could be brought back (see cage8, mouse id WY378). But this is still an ongoing problem. Other reasons need to be
-identified. Optimization of training protocol might be needed (e.g. introduce pole when headfixation is robust).
+On windows 10 OS, Matlab 2021, GUI occasionally crashes.
 
 It would be a very useful feature if we could adjust the pole postion at least along A-P axis (ideally also along M-L axis in future version).
 
