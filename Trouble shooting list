@@ -9,7 +9,7 @@ It would be a very useful feature if we could adjust the pole postion at least a
 
 5/17/2021
 Mice lick a lot but the protocol is stuck at the stage 0 even after 2000 trials with the performance >95%.
-The screws/nuts in the priston connectors might be loose. Check msg and see if the headfixation interval is increasing as expected (25s
+The screws/nuts in the priston connectors might be loose such that mice could easily escape. Check msg and see if the headfixation interval is increasing as expected (25s
 at final stage). The performance at msg should exceed 12/20 (60%) to proceed to a next stage.
 
 
