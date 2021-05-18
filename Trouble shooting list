@@ -7,6 +7,12 @@ It would be a very useful feature if we could adjust the pole postion at least a
 ====================== Resolved =============================
 (Please move the items above to below once fixed).
 
+5/17/2021
+Mice lick a lot but the protocol is stuck at the stage 0 even after 2000 trials with the performance >95%.
+The screws/nuts in the priston connectors might be loose. Check msg and see if the headfixation interval is increasing as expected (25s
+at final stage). The performance at msg should exceed 12/20 (60%) to proceed to a next stage.
+
+
 3/20/21
 A series of empty circles in a row in homecage GUI (not those programmed empty circles showing up hourly before headfixation stage) - no licking detection. 
 This is sometimes due to the default setting of maximum resistance on lickometer(s). Lower resistance usually fixes the problem (counterclock wise).
