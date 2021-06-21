@@ -25,3 +25,5 @@ LR_motor_position = 70
 FB_final_position = 30
 reward_left = 0.03
 reward_right= 0.03
+pole_left_position = 30
+pole_right_position = 100

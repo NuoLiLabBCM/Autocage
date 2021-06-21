@@ -280,15 +280,16 @@ typedef struct {
 
   float reward_left  = 0.03;
   float reward_right = 0.03;
+  
+  byte leftPos  = 30;
+  byte rightPos = 100;
   /////////////////////////////////////////////////
 } Parameters_behavior;
 
 Parameters_behavior    S;
 
 byte halfPos  = 65;
-byte leftPos  = 30;
-byte rightPos = 100;
-byte finalPos = leftPos;
+byte finalPos = 30; //leftPos;
 
 
 int LickPortMove         = 0;
@@ -834,6 +835,10 @@ void loop() {
         SerialUSB.print(F.struggle_thres_neg);
         SerialUSB.print(";");
         SerialUSB.print(F.struggle_thres_pos);
+        SerialUSB.print(";");
+		SerialUSB.print(S.leftPos);
+        SerialUSB.print(";");
+        SerialUSB.print(S.rightPos);
         SerialUSB.println(";");
         break;
       case 'T': //tare the scale to 0
@@ -849,6 +854,14 @@ void loop() {
         buffer_tmp = SerialUSB.readStringUntil('\n');
         F.struggle_thres_pos = buffer_tmp.toInt();
         write_SD_para_F();
+        break;
+	  case 'E': //set Pole left/right position
+        buffer_tmp = SerialUSB.readStringUntil('\n');
+        S.leftPos = buffer_tmp.toInt();
+        buffer_tmp = SerialUSB.readStringUntil('\n');
+        S.rightPos = buffer_tmp.toInt();
+		halfPos = (S.rightPos + S.leftPos)/2;
+        write_SD_para_S();
         break;
       case 'A': //
         send_PC_trials_24hr();
@@ -1297,23 +1310,31 @@ void MovePole(byte trial_type) {
   // halfPos, leftPos, rightPos, finalPos
   switch (trial_type) {
     case 0: // right
-      finalPos = rightPos;
+      finalPos = S.rightPos;
       break;
     case 1: // left
-      finalPos = leftPos;
+      finalPos = S.leftPos;
       break;
     case 2: // either
       if (random(100) < 50) {
-        finalPos = rightPos;
+        finalPos = S.rightPos;
       } else {
-        finalPos = leftPos;
+        finalPos = S.leftPos;
       }
       break;
   }
+  
   analogWrite(portMotorPole, halfPos);
   delay(750);
   analogWrite(portMotorPole, finalPos);
   delay(750);
+  
+  if (SerialUSB.dtr() && SerialUSB_connected()) {
+	SerialUSB.print("M: pole half/final Position: ");
+	SerialUSB.print(halfPos);
+	SerialUSB.print("/");
+	SerialUSB.println(finalPos);
+  }
 }
 
 
@@ -2785,6 +2806,11 @@ int write_SD_para_S() {
     dataFile.println(S.reward_left);
     dataFile.print("reward_right = ");
     dataFile.println(S.reward_right);
+	
+	dataFile.print("pole_left_position = ");
+    dataFile.println(S.leftPos);
+    dataFile.print("pole_right_position = ");
+    dataFile.println(S.rightPos);
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for write");
@@ -2914,6 +2940,14 @@ int read_SD_para_S() {
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     S.reward_right = buffer_tmp.toFloat();
+	
+	buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.leftPos  = buffer_tmp.toInt();
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.rightPos = buffer_tmp.toInt();
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for read");

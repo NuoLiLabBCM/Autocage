@@ -290,16 +290,18 @@ typedef struct {
 
   float reward_left  = 0.03;
   float reward_right = 0.03;
+  
+  byte anteriorPos  = 30;
+  byte posteriorPos = 100;
   /////////////////////////////////////////////////
 } Parameters_behavior;
 
 Parameters_behavior    S;
 
-byte anteriorPos  = 30;
-byte posteriorPos = 100;
-byte halfPos  = (anteriorPos + posteriorPos) / 2;
-byte finalPos = anteriorPos;
-
+//byte anteriorPos  = 30;
+//byte posteriorPos = 100;
+byte halfPos  = (S.anteriorPos + S.posteriorPos) / 2;
+byte finalPos = S.anteriorPos;
 
 int LickPortMove         = 0;
 const byte mov_step_size = 5;
@@ -847,6 +849,10 @@ void loop() {
         SerialUSB.print(F.struggle_thres_neg);
         SerialUSB.print(";");
         SerialUSB.print(F.struggle_thres_pos);
+        SerialUSB.print(";");
+		SerialUSB.print(S.anteriorPos);
+        SerialUSB.print(";");
+        SerialUSB.print(S.posteriorPos);
         SerialUSB.println(";");
         break;
       case 'T': //tare the scale to 0
@@ -862,6 +868,14 @@ void loop() {
         buffer_tmp = SerialUSB.readStringUntil('\n');
         F.struggle_thres_pos = buffer_tmp.toInt();
         write_SD_para_F();
+        break;
+	  case 'E': //set Pole left/right position
+        buffer_tmp = SerialUSB.readStringUntil('\n');
+        S.anteriorPos = buffer_tmp.toInt();
+        buffer_tmp = SerialUSB.readStringUntil('\n');
+        S.posteriorPos = buffer_tmp.toInt();
+		halfPos = (S.anteriorPos + S.posteriorPos)/2;
+        write_SD_para_S();
         break;
       case 'A': //
         send_PC_trials_24hr();
@@ -1311,23 +1325,23 @@ void MovePole(byte trial_type) {
   switch (trial_type) {
     case 0: // right
       if (contingency == 0) {
-        finalPos = posteriorPos;
+        finalPos = S.posteriorPos;
       } else {
-        finalPos = anteriorPos;
+        finalPos = S.anteriorPos;
       }
       break;
     case 1: // left
       if (contingency == 0) {
-        finalPos = anteriorPos;
+        finalPos = S.anteriorPos;
       } else {
-        finalPos = posteriorPos;
+        finalPos = S.posteriorPos;
       }
       break;
     case 2: // either
       if (random(100) < 50) {
-        finalPos = posteriorPos;
+        finalPos = S.posteriorPos;
       } else {
-        finalPos = anteriorPos;
+        finalPos = S.anteriorPos;
       }
       break;
   }
@@ -1335,6 +1349,13 @@ void MovePole(byte trial_type) {
   delay(750);
   analogWrite(portMotorPole, finalPos);
   delay(750);
+  
+  if (SerialUSB.dtr() && SerialUSB_connected()) {
+	SerialUSB.print("M: pole half/final Position: ");
+	SerialUSB.print(halfPos);
+	SerialUSB.print("/");
+	SerialUSB.println(finalPos);
+  }
 }
 
 
@@ -2833,6 +2854,11 @@ int write_SD_para_S() {
     dataFile.println(contingency);
     dataFile.print("contingency_trial = ");
     dataFile.println(contingency_trial);
+	
+	dataFile.print("pole_anterior_position = ");
+    dataFile.println(S.anteriorPos);
+    dataFile.print("pole_posterior_position = ");
+    dataFile.println(S.posteriorPos);
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for write");
@@ -2970,6 +2996,14 @@ int read_SD_para_S() {
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     contingency_trial = buffer_tmp.toInt();
+	
+	buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.anteriorPos  = buffer_tmp.toInt();
+
+    buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    S.posteriorPos = buffer_tmp.toInt();
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for read");
