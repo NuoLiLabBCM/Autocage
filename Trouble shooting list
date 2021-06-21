@@ -1,11 +1,12 @@
-﻿4/23/2021 
+﻿
+====================== Resolved =============================
+(Please move the items above to below once fixed).
+4/23/2021 
 
 On windows 10 OS, Matlab 2021, GUI occasionally crashes.
 
 It would be a very useful feature if we could adjust the pole postion at least along A-P axis (ideally also along M-L axis in future version).
 
-====================== Resolved =============================
-(Please move the items above to below once fixed).
 
 5/17/2021
 Mice lick a lot but the protocol is stuck at the stage 0 even after 2000 trials with the performance >95%.
