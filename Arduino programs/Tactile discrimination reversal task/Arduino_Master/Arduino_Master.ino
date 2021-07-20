@@ -2139,7 +2139,7 @@ int autoReward() {
           n_LSideList++;
         }
       }
-      if (n_RSideList = error_trials) {
+      if (n_RSideList == error_trials) {
         S.GaveFreeReward.flag_R_water = 1;
         S.GaveFreeReward.flag_L_water = 0;
         S.GaveFreeReward.past_trials = 0;
