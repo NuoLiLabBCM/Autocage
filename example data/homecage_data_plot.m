@@ -50,14 +50,15 @@ else
 end
 
 %% extract events
+event(:,1) = event(:,1)/1000;       % convert timestamp unit to sec
 current_time = 0;
 for i = 1:size(event,1)
+    event(i,1) = current_time + event(i,1);
+    
     if event(i,2) == 1 % restart Arduino
         if event(i,1) > current_time
             current_time = event(i,1);
         end
-    else
-        event(i,1) = current_time + event(i,1)/1000;
     end
 end
 start_datetime = datetime(trial{1}(1),'ConvertFrom','posixtime');% event(1,1) trial{1}(1)
