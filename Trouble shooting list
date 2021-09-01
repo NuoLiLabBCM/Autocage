@@ -1,4 +1,10 @@
-﻿
+9/1/2021
+Feedback from motor should provide pole position to master Arduino. If feedback is not recived (e.g. when motor is broken), the master arduino should pause and give an error message.
+
+9/1/2021
+Matlab GUI occasionally loss connection with the cage but does not know it. As a result, it does not show trial data, even though the Autocage itself is running along. This can be checked by clicking the "Read" button on the GUI and see if parameters are updated (e.g. weight reading). If spotted, this can be fixed disconnect and reconnect the COM again.
+ 
+ 
 ====================== Resolved =============================
 (Please move the items above to below once fixed).
 4/23/2021 
