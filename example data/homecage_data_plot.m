@@ -50,21 +50,24 @@ else
 end
 
 %% extract events
-event(:,1) = event(:,1)/1000;       % convert timestamp unit to sec
 current_time = 0;
+first_reset_time = nan;
 for i = 1:size(event,1)
-    event(i,1) = current_time + event(i,1);
-    
     if event(i,2) == 1 % restart Arduino
+        if current_time == 0    % get the first Arduino reset event, use this as the start time for event
+            first_reset_time = event(i,1);
+        end
         if event(i,1) > current_time
             current_time = event(i,1);
         end
+    else
+        event(i,1) = current_time + event(i,1)/1000;
     end
 end
 start_datetime = datetime(trial{1}(1),'ConvertFrom','posixtime');% event(1,1) trial{1}(1)
 disp(string(start_datetime));
 
-event_time_sec = round(event(:,1) - event(1,1));
+event_time_sec = round(event(:,1) - first_reset_time);
 event_time_sec(event_time_sec==0) = 1; % to avoid zero index
 event_time_min = event_time_sec/60; % min
 event_id       = event(:,2);
@@ -117,7 +120,7 @@ set(gca,'YTick',[2 3 4],'YTickLabel',{'Release','Fixation','Trigger'});
 subplot(2,1,2,'FontSize',16), hold on,
 h3 = stem(Fixation_release_struggle_time, Fixation_release_struggle_value,'b');
 h1 = stem(Fixation_release_timeup_time, Fixation_release_timeup_value,'g');
-% h2 = stem(Fixation_release_escape_time, Fixation_release_escape_value,'r');
+h2 = stem(Fixation_release_escape_time, Fixation_release_escape_value,'r');
 xlim([0,event_time_min(end)]); ylabel('Duration (s)');
 ylim([0 1.1*max(Fixation_release_timeup_value)]);
 
