@@ -1,5 +1,6 @@
-9/1/2021
-Feedback from motor should provide pole position to master Arduino. If feedback is not recived (e.g. when motor is broken), the master arduino should pause and give an error message.
+1/18/2022
+Occasionally, the timestamp in the EVENTS file resets without logging a 'reset event' (event code 1). This causes headfixation data not being plotted correctly in the analysis script.
+The cause of this issue is currently unknown and not replicated. When this occurs, this issue currently can be fixed by manually inserting a reset event (unix time 1 -1) to the data file at the location where the resetting occured.
 
 9/1/2021
 Matlab GUI occasionally loss connection with the cage but does not know it. As a result, it does not show trial data, even though the Autocage itself is running along. This can be checked by clicking the "Read" button on the GUI and see if parameters are updated (e.g. weight reading). If spotted, this can be fixed disconnect and reconnect the COM again.
@@ -7,6 +8,10 @@ Matlab GUI occasionally loss connection with the cage but does not know it. As a
  
 ====================== Resolved =============================
 (Please move the items above to below once fixed).
+9/1/2021
+Feedback from motor should provide pole position to master Arduino. If feedback is not recived (e.g. when motor is broken), the master arduino should pause and give an error message.
+
+
 4/23/2021 
 
 On windows 10 OS, Matlab 2021, GUI occasionally crashes.
