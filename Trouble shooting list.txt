@@ -9,9 +9,10 @@ The cause of this issue is currently unknown and not replicated. When this occur
 9/1/2021
 Feedback from motor should provide pole position to master Arduino. If feedback is not recived (e.g. when motor is broken), the master arduino should pause and give an error message.
 
+9/1/2021
+Matlab GUI occasionally loss connection with the cage but does not know it. As a result, it does not show trial data, even though the Autocage itself is running along. This can be checked by clicking the "Read" button on the GUI and see if parameters are updated (e.g. weight reading). If spotted, this can be fixed disconnect and reconnect the COM again. 
 
 4/23/2021 
-
 On windows 10 OS, Matlab 2021, GUI occasionally crashes.
 
 It would be a very useful feature if we could adjust the pole postion at least along A-P axis (ideally also along M-L axis in future version).
@@ -110,10 +111,4 @@ following information:
 User has to reset the Arduino_Master in order to get out of the above issues.
 it seems that the issues are casued by the commuication between PC and arduino.
 
-
-9/1/2021
-Feedback from motor should provide pole position to master Arduino. If feedback is not recived (e.g. when motor is broken), the master arduino should pause and give an error message.
-
-9/1/2021
-Matlab GUI occasionally loss connection with the cage but does not know it. As a result, it does not show trial data, even though the Autocage itself is running along. This can be checked by clicking the "Read" button on the GUI and see if parameters are updated (e.g. weight reading). If spotted, this can be fixed disconnect and reconnect the COM again.
  
