@@ -156,11 +156,11 @@ handles.hlistbox = uicontrol('Style','listbox',...
 handles.hbutton_deleteSel = uicontrol('Style','pushbutton','String','Delete Sel',...
     'Units', 'normalized',        'Tag', 'button_deleteSel',...
     'Callback',@button_deleteSel_Callback,...
-    'Position',[0.08,0.13,0.04,0.03]);
+    'Position',[0.08,0.14,0.04,0.02]);
 handles.hbutton_clearAll = uicontrol('Style','pushbutton','String','Clear All',...
     'Units', 'normalized',        'Tag', 'button_clearAll',...
     'Callback',@button_clearAll_Callback,...
-    'Position',[0.035,0.13,0.04,0.03]);
+    'Position',[0.035,0.14,0.04,0.02]);
 handles.htext_errorMsg = uicontrol('Style','text','String','Error Message',...
     'Units', 'normalized',        'Tag', 'text_errorMsg',...
     'Position',[0.035,0.47,0.06,0.02]);
@@ -311,13 +311,31 @@ handles.hbutton_loadParas = uicontrol('Style','pushbutton','String','Load Paras'
     'Callback',@button_loadParas_Callback,...
     'Position',[0.86,0.16,0.04,0.03]);
 
+
+% listbox for warnings
+handles.hwarnbox = uicontrol('Style','listbox',...
+    'ForegroundColor', 'red',...
+    'Units', 'normalized','Position',[0.005 0.03 0.12 0.08]);
+handles.hbutton_deleteSelwarn = uicontrol('Style','pushbutton','String','Delete Sel',...
+    'Units', 'normalized',        'Tag', 'button_deleteSelwarn',...
+    'Callback',@button_deleteSelwarn_Callback,...
+    'Position',[0.08,0.005,0.04,0.02]);
+handles.hbutton_clearAllwarn = uicontrol('Style','pushbutton','String','Clear All',...
+    'Units', 'normalized',        'Tag', 'button_clearAllwarn',...
+    'Callback',@button_clearAllwarn_Callback,...
+    'Position',[0.035,0.005,0.04,0.02]);
+handles.htext_warnMsg = uicontrol('Style','text','String','Warning',...
+    'Units', 'normalized',        'Tag', 'text_warnMsg',...
+    'ForegroundColor', 'red',...
+    'Position',[0.035,0.11,0.06,0.015]);
+
 % Create Timer to update GUI (background color and weight) periodically
 TimerInteval = 600;       % Default timer interval (10 min)
 handles.update_timer = timer('Name','MainTimer', 'TimerFcn',{@updateGUI},...
     'Period',TimerInteval,'ExecutionMode','fixedRate');
 start(handles.update_timer);
 
-SerialTimerInterval = 1; % every 1 second
+SerialTimerInterval = 2; % every 1 second
 handles.serial_update_timer = timer('Name','serialTimer','TimerFcn',{@serialTimer},...
     'Period',SerialTimerInterval,'ExecutionMode','fixedRate');
 start(handles.serial_update_timer);
@@ -683,10 +701,10 @@ start(handles.serial_update_timer);
             n_items = length(existingItems);
             if(selectedId == 1)
                 % The first element has been selected
-                upd_list={existingItems(2:end)};
+                upd_list=existingItems(2:end);
             elseif(selectedId == n_items)
                 % The last element has been selected
-                upd_list={existingItems(1:end-1)};
+                upd_list=existingItems(1:end-1);
                 % Set the "Value" property to the previous element
                 set(handles.hlistbox, 'Value', selectedId-1);
             else
@@ -700,6 +718,40 @@ start(handles.serial_update_timer);
 
     function button_clearAll_Callback(~, ~)
         set(handles.hlistbox, 'String', '');
+    end
+
+function button_deleteSelwarn_Callback(~, ~)
+        
+        selectedId = get(handles.hwarnbox, 'Value');        % get id of selectedLabelName
+        existingItems = get(handles.hwarnbox, 'String');    % get current listbox list
+        
+        % Identify the items: if in the list only one ites has been added the
+        % returned list is a char array
+        if(class(existingItems) == 'char')
+            upd_list = '';
+            set(handles.hwarnbox, 'String', upd_list)
+        else
+            % If the returned list is a cell array there are three cases
+            n_items = length(existingItems);
+            if(selectedId == 1)
+                % The first element has been selected
+                upd_list=existingItems(2:end);
+            elseif(selectedId == n_items)
+                % The last element has been selected
+                upd_list=existingItems(1:end-1);
+                % Set the "Value" property to the previous element
+                set(handles.hwarnbox, 'Value', selectedId-1);
+            else
+                % And element in the list has been selected
+                upd_list={existingItems{1:selectedId-1} existingItems{selectedId+1:end}};
+            end
+        end
+        % Update the list
+        set(handles.hwarnbox, 'String', upd_list);     % restore cropped version of label list
+    end
+
+    function button_clearAllwarn_Callback(~, ~)
+        set(handles.hwarnbox, 'String', '');
     end
 
 %% Serial Callback
@@ -859,6 +911,23 @@ start(handles.serial_update_timer);
                 catch e
                     disp('Serial Callback - end of receiving 24-hr data and plot');
                     disp(e);
+                end
+                
+            case 'B' % warning
+                %if (A(2)==':')
+                if (A(4)=='p')
+                    try
+                        existingItems = get(handles.hwarnbox, 'String');    % get current listbox list
+                        n_items = length(existingItems);
+                        existingItems{n_items+1} = ['Cage ',num2str(i_cage),': ',A(4:end),' (',datestr(now),')'];
+                        set(handles.hwarnbox, 'String', existingItems);
+                        set(handles.hwarnbox, 'Value', n_items+1);
+                        fprintf(handles.fileID(i_cage),[A(4:end) '\n']);
+                    catch e
+                        disp('Serial Callback-Error');
+                        disp(e);
+                    end
+                    clear existingItems;
                 end
             
             otherwise

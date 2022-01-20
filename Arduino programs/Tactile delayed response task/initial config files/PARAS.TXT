@@ -27,3 +27,4 @@ reward_left = 0.03
 reward_right= 0.03
 pole_left_position = 30
 pole_right_position = 100
+is_motor_ok = 1

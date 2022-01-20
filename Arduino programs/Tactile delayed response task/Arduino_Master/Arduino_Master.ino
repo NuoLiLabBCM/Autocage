@@ -127,8 +127,15 @@ bool headfixation_again             = 0;
 int regulatorVal_step    = 10;  // not used
 int regulatorVal_min     = 150; // start with a small pressure
 int regulatorVal_max     = 255; // max pressure
-int regulatorVal_release = 30;  // slightly release to reduce retract distance and noise
+int regulatorVal_release = 10; //30;  // slightly release to reduce retract distance and noise
 
+int polePos;
+int poleLastPos;
+int portMotorPos = A0;
+bool isMotorOK = 1; 
+int failureCont = 0;
+int failureMax = 5;
+int lastFailure = 0;
 
 /****************************************************************************************************/
 /************************************* Finite State Matrix related **********************************/
@@ -357,6 +364,7 @@ void watchdogSetup(void)
 
 void setup() {
   isStruck = 0;
+  isMotorOK = 1;
 	
   watchdogEnable(watchdogTime);
   
@@ -386,7 +394,7 @@ void setup() {
   pinMode(portMotorLR, OUTPUT);
   pinMode(portMotorFB, OUTPUT);
   pinMode(portMotorPole, OUTPUT);
-
+  
   analogWrite(portMotorLR, 5);
   analogWrite(portMotorFB, 5);
   analogWrite(portMotorPole, 5);
@@ -489,6 +497,8 @@ void loop() {
 		if (sdcard ==0){
 			sdcard =1;
 			SD.begin(chipSelect);
+			read_SD_para_F();
+			read_SD_para_S();
 		}
 	}else{
 		if (sdcard ==1){
@@ -500,7 +510,7 @@ void loop() {
 	}	
 
   // if (Rocker_switch is ON && SD card inserted), run the state matrix
-  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0) {
+  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0 && isMotorOK==1) {
 
     if (paused == 1) {
       paused = 0;
@@ -525,6 +535,7 @@ void loop() {
       //SD.begin(chipSelect);
       read_SD_para_F();
       read_SD_para_S();
+	  
       analogWrite(portMotorLR, S.LR_motor_position);
       analogWrite(portMotorFB, S.FB_motor_position);
 
@@ -782,7 +793,13 @@ void loop() {
       case 'P':  // Motor Pole; 0-255; 30 is anterior, 100 is posterior
         dataByte = SerialUSBReadByte();
         analogWrite(portMotorPole, dataByte);
-        // delay(500);
+        delay(1000);
+		analogReadResolution(12);
+		polePos = analogRead(portMotorPos);
+		if (SerialUSB.dtr() && SerialUSB_connected()) {
+			SerialUSB.print("M: pole Position: ");
+			SerialUSB.println(polePos);
+		}
         break;
       case 'f': // update motor F/B final position
         dataByte = SerialUSBReadByte();
@@ -860,7 +877,7 @@ void loop() {
         S.leftPos = buffer_tmp.toInt();
         buffer_tmp = SerialUSB.readStringUntil('\n');
         S.rightPos = buffer_tmp.toInt();
-		halfPos = (S.rightPos + S.leftPos)/2;
+		//halfPos = (S.rightPos + S.leftPos)/2;
         write_SD_para_S();
         break;
       case 'A': //
@@ -1307,6 +1324,7 @@ int send_protocol_to_Bpod_and_Run() {
 
 
 void MovePole(byte trial_type) {
+  poleLastPos = analogRead(portMotorPos);
   // halfPos, leftPos, rightPos, finalPos
   switch (trial_type) {
     case 0: // right
@@ -1324,17 +1342,49 @@ void MovePole(byte trial_type) {
       break;
   }
   
+  halfPos = (S.rightPos + S.leftPos)/2;
   analogWrite(portMotorPole, halfPos);
-  delay(750);
+  delay(1000);
+  
+  analogReadResolution(12);
+  polePos = analogRead(portMotorPos);
+  
   analogWrite(portMotorPole, finalPos);
-  delay(750);
+  delay(1000);
   
   if (SerialUSB.dtr() && SerialUSB_connected()) {
 	SerialUSB.print("M: pole half/final Position: ");
 	SerialUSB.print(halfPos);
 	SerialUSB.print("/");
 	SerialUSB.println(finalPos);
+	
+	SerialUSB.print("M: pole motor last/curr Position: ");
+	SerialUSB.print(poleLastPos);
+	SerialUSB.print("/");
+	SerialUSB.println(polePos);
   }
+	
+  if (abs(polePos-poleLastPos) < 50) {
+	lastFailure=1;
+  }else{	
+	lastFailure=0;
+  }
+	
+  if (lastFailure ==1) {
+	failureCont++;
+  }else{
+	failureCont = 0;
+  }
+			
+  if (failureCont >= failureMax) {
+	failureCont = 0;
+	isMotorOK = 0;
+	lastFailure = 0;
+	write_SD_para_S();
+	if (SerialUSB.dtr() && SerialUSB_connected()) {
+		SerialUSB.println("B: pole motor has problem ");
+	}
+  }		
 }
 
 
@@ -2811,6 +2861,9 @@ int write_SD_para_S() {
     dataFile.println(S.leftPos);
     dataFile.print("pole_right_position = ");
     dataFile.println(S.rightPos);
+	
+	dataFile.print("is_motor_ok = ");
+    dataFile.println(isMotorOK);
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for write");
@@ -2948,6 +3001,10 @@ int read_SD_para_S() {
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     S.rightPos = buffer_tmp.toInt();
+	
+	buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    isMotorOK = buffer_tmp.toInt();
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for read");
