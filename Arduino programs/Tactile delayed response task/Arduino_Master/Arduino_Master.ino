@@ -1382,7 +1382,8 @@ void MovePole(byte trial_type) {
 	lastFailure = 0;
 	write_SD_para_S();
 	if (SerialUSB.dtr() && SerialUSB_connected()) {
-		SerialUSB.println("B: pole motor has problem ");
+		//SerialUSB.println("B: pole motor has problem ");
+		SerialUSB.println("Q: pole motor has problem ");
 	}
   }		
 }
