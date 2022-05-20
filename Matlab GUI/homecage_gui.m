@@ -2,33 +2,48 @@ function homecage_gui(varargin)
 % HOMECAGE_GUI shows graphic user interfaces of the automatic homecages
 %
 %      Current Cage Number: 
-%           30
+%           40
 %
 %      Function:
-%           Display Messages received from (up to 30) Arduino_Controllers (Homecages);
+%           Display Messages received from (up to 40) Arduino_Controllers (Homecages);
 %           Send motor_move command to Controller to move 3 motors;
 %
 %
 %       Created on                 09/15/2018   by Y.H.
 %       Last modified on           09/06/2020   by Y.H.
 %       modified to ver1.0 on      11/30/2020
+%       modified to display 40 cages      12/14/2021
 
 %% GUI preparation
 global handles
-handles.total_cage_num = 30;
+handles.total_cage_num = 40;
 handles.default_color = [.7 .9 .8];  % default background color [.93 .93 .93];
 handles.trial_24 = [];
 
 hsv_map = hsv(24);
 handles.mymap = hsv_map(1:8,:); % 1:8 from red to yellow to green
 
+
 handles.hfigure = figure('name','HomeCage GUI', 'numbertitle','off', 'MenuBar','none',...
-    'CloseRequestFcn', @closeGUI_Callback, 'Position', get(0,'Screensize'));
-for cage_i = 1:handles.total_cage_num
-    handles.hsubplot(cage_i) = subplot(4,8,cage_i);
-    box on;
-    set(gca,'xtick',[]);
-    set(gca,'ytick',[]);
+    'CloseRequestFcn', @closeGUI_Callback, 'Position', get(0,'Screensize'), 'WindowState', 'maximized');
+
+deltw = 1/10; 
+delth = 1/5.5; 
+lenI = 5;
+lenJ = 8;
+
+%for cage_i = 1:handles.total_cage_num
+for ii= 1:lenI
+    for jj= 1:lenJ
+        cage_i= lenJ *(ii-1) + jj;
+        pos(cage_i,1) = deltw * (jj+0.45);
+        pos(cage_i,2) = delth * (lenI-ii+0.4);
+        pos(cage_i,3) = deltw-0.02;
+        pos(cage_i,4) = delth-0.04;
+        handles.hsubplot(cage_i) = subplot('Position', pos(cage_i,:));
+        box on;
+        set(gca,'xtick',[]);
+        set(gca,'ytick',[]);
     
     % Current supplot panel posititon
     pos(cage_i,:) = get(handles.hsubplot(cage_i), 'Position'); 
@@ -45,18 +60,18 @@ for cage_i = 1:handles.total_cage_num
     handles.htext_title(cage_i) = uicontrol('Style','text','String',['Cage ',int2str(cage_i),' - '],...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'FontSize',11, 'FontWeight','bold',...
-        'Position',[pos(cage_i,1),pos(cage_i,2)+0.158,0.04,0.02]);
+        'Position',[pos(cage_i,1),pos(cage_i,2)+0.142,0.04,0.02]);
     
     % Mice Name
     handles.hedit_mice(cage_i) = uicontrol('Style','edit','String','YH00',...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@edit_mice_Callback,...
-        'Position',[pos(cage_i,1)+0.037,pos(cage_i,2)+0.159,0.02,0.02]);
+        'Position',[pos(cage_i,1)+0.037,pos(cage_i,2)+0.143,0.02,0.02]);
     
     % Days
     handles.htext_days(cage_i) = uicontrol('Style','text','String','00 days ',...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
-        'Position',[pos(cage_i,1)+0.057,pos(cage_i,2)+0.16,0.03,0.015]);
+        'Position',[pos(cage_i,1)+0.057,pos(cage_i,2)+0.153,0.03,0.015]);
     
     % Popup for chosing COM port
     if isempty(serialportlist)
@@ -65,7 +80,7 @@ for cage_i = 1:handles.total_cage_num
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@popup_com_Callback,...
         'ButtonDownFcn',@popup_com_Buttondown,...
-        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.102,0.032,0.03],...
+        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.085,0.032,0.02],...
         'TooltipString', 'Right-click to update COM list');
     else
         handles.hpopup(cage_i) = uicontrol('Style','popupmenu',...
@@ -73,71 +88,72 @@ for cage_i = 1:handles.total_cage_num
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@popup_com_Callback,...
         'ButtonDownFcn',@popup_com_Buttondown,...
-        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.102,0.032,0.03],...
+        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.085,0.032,0.02],...
         'TooltipString', 'Right-click to update COM list');
     end
     
-    handles.hbutton_open(cage_i) = uicontrol('Style','pushbutton','String','open',...
+    handles.hbutton_open(cage_i) = uicontrol('Style','pushbutton','String','Open',...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@button_open_Callback,...
-        'Position',[pos(cage_i,1)+0.01,pos(cage_i,2)+0.134,0.02,0.018]);
+        'Position',[pos(cage_i,1)+0.01,pos(cage_i,2)+0.115,0.02,0.018]);
     
     % trial numbers in 24 hr.
     handles.htext_trailNum24hr(cage_i) = uicontrol('style','text',...
         'String', 'TrialNum/24hr',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.035,pos(cage_i,2)+0.134,0.036,0.018]);
+        'Position',[pos(cage_i,1)+0.035,pos(cage_i,2)+0.115,0.036,0.018]);
     
     % Select a start date button
     handles.hedit_date(cage_i) = uicontrol('Style','edit','String','dd-mmm',...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@edit_date_Callback,...
-        'Position',[pos(cage_i,1)+0.04,pos(cage_i,2)+0.11,0.025,0.02]);
+        'Position',[pos(cage_i,1)+0.04,pos(cage_i,2)+0.085,0.025,0.02]);
     
     handles.hbutton_chooseStartDate(cage_i) = uicontrol('Style','pushbutton','String','...',...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@button_chooseStartDate_Callback,...
-        'Position',[pos(cage_i,1)+0.065,pos(cage_i,2)+0.11,0.01,0.02]);
+        'Position',[pos(cage_i,1)+0.065,pos(cage_i,2)+0.085,0.01,0.02]);
     
     % Plot button
     handles.hbutton_plotPW(cage_i) = uicontrol('Style','pushbutton','String','Plot_P/W',...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@button_plotPW_Callback,...
-        'Position',[pos(cage_i,1)+0.04,pos(cage_i,2)+0.07,0.03,0.03],...
+        'Position',[pos(cage_i,1)+0.04,pos(cage_i,2)+0.055,0.03,0.02],...
         'Enable','on');
     
     % Open Message txt file
     handles.hbutton_msg(cage_i) = uicontrol('Style','pushbutton','String','Msg',...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'Callback',@button_msg_Callback,...
-        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.07,0.03,0.03]);
+        'Position',[pos(cage_i,1)+0.01,pos(cage_i,2)+0.055,0.025,0.02]);
     
     % Trial No. and Perf100
     handles.htext_trailNum(cage_i) = uicontrol('style','text',...
         'String', 'Trial No.',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.045,0.03,0.02]);
+        'Position',[pos(cage_i,1)+0.005,pos(cage_i,2)+0.025,0.03,0.02]);
     
     handles.htext_hf1(cage_i) = uicontrol('style','text',...
         'String', ' - ',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.035,pos(cage_i,2)+0.045,0.01,0.02]);
+        'Position',[pos(cage_i,1)+0.035,pos(cage_i,2)+0.025,0.01,0.02]);
     
     handles.htext_perf100(cage_i) = uicontrol('style','text',...
         'String', '0%',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.045,pos(cage_i,2)+0.045,0.03,0.02]);
+        'Position',[pos(cage_i,1)+0.045,pos(cage_i,2)+0.025,0.03,0.02]);
     
     % Protocol info: currentProtocol-trialsNumsinThisProtocol-Perf30
     handles.htext_Protocol(cage_i) = uicontrol('style','text',...
         'String', 'iProt - iTrial - 00%',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.003,pos(cage_i,2)+0.025,0.048,0.02]);
+        'Position',[pos(cage_i,1)+0.003,pos(cage_i,2)+0.005,0.048,0.02]);
     
     handles.htext_early(cage_i) = uicontrol('style','text',...
         'String', 'EL:',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.051,pos(cage_i,2)+0.025,0.01,0.02]);
+        'Position',[pos(cage_i,1)+0.051,pos(cage_i,2)+0.005,0.01,0.02]);
     
     handles.htext_earlylick(cage_i) = uicontrol('style','text',...
         'String', '00%',        'Units', 'normalized',...
-        'Position',[pos(cage_i,1)+0.061,pos(cage_i,2)+0.025,0.015,0.02]);
+        'Position',[pos(cage_i,1)+0.061,pos(cage_i,2)+0.005,0.015,0.02]);
     
     set_background_color(cage_i,handles.default_color); % set default background color
+    end
 end
 
 % Protocol Info
@@ -152,182 +168,182 @@ handles.htext_protocolInfo = uicontrol('Style','text',...
 
 % listbox for error message
 handles.hlistbox = uicontrol('Style','listbox',...
-    'Units', 'normalized','Position',[0.005 0.17 0.12 0.3]);
+    'Units', 'normalized','Position',[0.005 0.20 0.12 0.3]);
 handles.hbutton_deleteSel = uicontrol('Style','pushbutton','String','Delete Sel',...
     'Units', 'normalized',        'Tag', 'button_deleteSel',...
     'Callback',@button_deleteSel_Callback,...
-    'Position',[0.08,0.14,0.04,0.02]);
+    'Position',[0.08,0.175,0.04,0.02]);
 handles.hbutton_clearAll = uicontrol('Style','pushbutton','String','Clear All',...
     'Units', 'normalized',        'Tag', 'button_clearAll',...
     'Callback',@button_clearAll_Callback,...
-    'Position',[0.035,0.14,0.04,0.02]);
+    'Position',[0.035,0.175,0.04,0.02]);
 handles.htext_errorMsg = uicontrol('Style','text','String','Error Message',...
     'Units', 'normalized',        'Tag', 'text_errorMsg',...
-    'Position',[0.035,0.47,0.06,0.02]);
+    'Position',[0.035,0.5,0.06,0.02]);
 
 % Show Color bar for the trial number in last 24 hours
 colormap(handles.mymap);
 colorbar('Ticks',0.0625:0.125:1,'TickLabels',{'80','160','240','320','400','480','560 (24hr)','640 Trials'},...
-    'Position',[0.72, 0.11, 0.01, 0.16]);
+    'Position',[0.945, 0.55, 0.01, 0.16]);
 
 % control panel
 handles.hpanel = uipanel('Title','Control Panel',...
-    'Position',[.005 .495 .12 .352]);
+    'Position',[.005 .53 .12 .352]);
 
 % Popup for chosing Which Cage
 handles.htext_whichCage = uicontrol('Style','text','String','Cage: ',...
     'Units', 'normalized',        'Tag', 'text_whichcage',...
-    'Position',[0.01,0.805,0.02,0.02]);
+    'Position',[0.01,0.835,0.02,0.02]);
 handles.hpopup_Cage = uicontrol('Style','popupmenu',...
     'String',[{'Choose a Cage'} ; 1:handles.total_cage_num],...
     'Units', 'normalized',        'Tag', 'popup_whichcage',...
-    'Position',[0.03,0.81,0.04,0.02],...
+    'Position',[0.03,0.84,0.04,0.02],...
     'Callback',{@button_moveSet,'Read'},...
     'TooltipString', 'Which Cage to Control');
 handles.hbutton_readParas = uicontrol('Style','pushbutton','String','Read',...
     'Units', 'normalized',        'Tag', 'button_read',...
     'Callback',{@button_moveSet,'Read'},...
-    'Position',[0.075,0.805,0.04,0.025]);
+    'Position',[0.075,0.84,0.04,0.02]);
 
 % motor FB
 handles.htext_motorFB = uicontrol('Style','text','String','MotorFB',...
     'Units', 'normalized',        'Tag', 'text_motorFB',...
-    'Position',[0.01,0.765,0.03,0.02],'HorizontalAlignment', 'left');
+    'Position',[0.01,0.8,0.03,0.02],'HorizontalAlignment', 'left');
 handles.hedit_motorFB = uicontrol('Style','edit','String','0',...
     'Units', 'normalized',        'Tag', 'edit_motorFB',...
-    'Position',[0.04,0.77,0.025,0.02]);
+    'Position',[0.04,0.805,0.025,0.02]);
 handles.hbutton_motorFB = uicontrol('Style','pushbutton','String','Move & Set',...
     'Units', 'normalized',        'Tag', 'button_motorFB',...
     'Callback',{@button_moveSet,'FB'},...
-    'Position',[0.07,0.77,0.04,0.02]);
+    'Position',[0.07,0.805,0.04,0.02]);
 
 % motor LR
 handles.htext_motorLR = uicontrol('Style','text','String','MotorLR',...
     'Units', 'normalized',        'Tag', 'text_motorLR',...
-    'Position',[0.01,0.74,0.03,0.02],'HorizontalAlignment', 'left');
+    'Position',[0.01,0.775,0.03,0.02],'HorizontalAlignment', 'left');
 handles.hedit_motorLR = uicontrol('Style','edit','String','0',...
     'Units', 'normalized',        'Tag', 'edit_motorLR',...
-    'Position',[0.04,0.745,0.025,0.02]);
+    'Position',[0.04,0.78,0.025,0.02]);
 handles.hbutton_motorLR = uicontrol('Style','pushbutton','String','Move & Set',...
     'Units', 'normalized',        'Tag', 'button_motorLR',...
     'Callback',{@button_moveSet,'LR'},...
-    'Position',[0.07,0.745,0.04,0.02]);
+    'Position',[0.07,0.78,0.04,0.02]);
 
 % motor Pole
 handles.htext_motorPole = uicontrol('Style','text','String','MotorPole',...
     'Units', 'normalized',        'Tag', 'text_motorPole',...
-    'Position',[0.01,0.715,0.03,0.02],'HorizontalAlignment', 'left');
+    'Position',[0.01,0.75,0.03,0.02],'HorizontalAlignment', 'left');
 handles.hedit_motorPole = uicontrol('Style','edit','String','0',...
     'Units', 'normalized',        'Tag', 'edit_motorPole',...
-    'Position',[0.04,0.72,0.025,0.02]);
+    'Position',[0.04,0.755,0.025,0.02]);
 handles.hbutton_motorPole = uicontrol('Style','pushbutton','String','Move',...
     'Units', 'normalized',        'Tag', 'button_motorPole',...
     'Callback',{@button_moveSet,'Pole'},...
-    'Position',[0.07,0.72,0.04,0.02]);
+    'Position',[0.07,0.755,0.04,0.02]);
 
 % motor FB final
 handles.htext_finalFB = uicontrol('Style','text','String','FinalFB',...
     'Units', 'normalized',        'Tag', 'text_finalFB',...
-    'Position',[0.01,0.69,0.03,0.02],'HorizontalAlignment', 'left');
+    'Position',[0.01,0.725,0.03,0.02],'HorizontalAlignment', 'left');
 handles.hedit_finalFB = uicontrol('Style','edit','String','0',...
     'Units', 'normalized',        'Tag', 'edit_finalFB',...
-    'Position',[0.04,0.695,0.025,0.02]);
+    'Position',[0.04,0.73,0.025,0.02]);
 handles.hbutton_finalFB = uicontrol('Style','pushbutton','String','Set',...
     'Units', 'normalized',        'Tag', 'button_finalFB',...
     'Callback',{@button_moveSet,'Final'},...
-    'Position',[0.07,0.695,0.04,0.02]);
+    'Position',[0.07,0.73,0.04,0.02]);
 
 % Reward left right
 handles.htext_rewardLeft = uicontrol('Style','text','String','Left (s)',...
     'Units', 'normalized',        'Tag', 'text_rewardLeft',...
-    'Position',[0.01,0.66,0.03,0.02],'HorizontalAlignment', 'left');
+    'Position',[0.01,0.695,0.03,0.02],'HorizontalAlignment', 'left');
 handles.hedit_rewardLeft = uicontrol('Style','edit','String','0.03',...
     'Units', 'normalized',        'Tag', 'edit_rewardLeft',...
-    'Position',[0.04,0.665,0.025,0.02]);
+    'Position',[0.04,0.7,0.025,0.02]);
 handles.htext_rewardRight = uicontrol('Style','text','String','Right (s)',...
     'Units', 'normalized',        'Tag', 'text_rewardRight',...
-    'Position',[0.01,0.635,0.03,0.02],'HorizontalAlignment', 'left');
+    'Position',[0.01,0.67,0.03,0.02],'HorizontalAlignment', 'left');
 handles.hedit_rewardRight = uicontrol('Style','edit','String','0.03',...
     'Units', 'normalized',        'Tag', 'edit_rewardRight',...
-    'Position',[0.04,0.64,0.025,0.02]);
+    'Position',[0.04,0.675,0.025,0.02]);
 
 handles.hbutton_reward = uicontrol('Style','pushbutton','String','Set&Reward',...
     'Units', 'normalized',        'Tag', 'button_reward',...
     'Callback',{@button_moveSet,'Reward'},...
-    'Position',[0.07,0.6525,0.04,0.02]);
+    'Position',[0.07,0.6875,0.04,0.02]);
 
 % weight
 handles.htext_tare = uicontrol('Style','text','String','Weight (s)',...
     'Units', 'normalized',        'Tag', 'text_tare',...
-    'Position',[0.01,0.605,0.03,0.02],'HorizontalAlignment', 'left');
+    'Position',[0.01,0.64,0.03,0.02],'HorizontalAlignment', 'left');
 handles.hedit_tare = uicontrol('Style','edit','String','0',...
     'Units', 'normalized',        'Tag', 'edit_tare',...
-    'Position',[0.04,0.61,0.025,0.02]);
+    'Position',[0.04,0.645,0.025,0.02]);
 handles.hbutton_tare = uicontrol('Style','pushbutton','String','Tare',...
     'Units', 'normalized',        'Tag', 'button_tare',...
     'Callback',{@button_moveSet,'Tare'},...
-    'Position',[0.07,0.61,0.04,0.02]);
+    'Position',[0.07,0.645,0.04,0.02]);
 
 % Struggle threshold H and L
 handles.htext_struggleH = uicontrol('Style','text','String','Struggle Threshold (g)',...
     'Units', 'normalized',        'Tag', 'text_struggleH',...
-    'Position',[0.01,0.55,0.032,0.05],'HorizontalAlignment', 'left');
+    'Position',[0.01,0.585,0.032,0.05],'HorizontalAlignment', 'left');
 handles.hedit_struggleH = uicontrol('Style','edit','String','36',...
     'Units', 'normalized',        'Tag', 'edit_struggleH',...
-    'Position',[0.04,0.58,0.025,0.02]);
+    'Position',[0.04,0.615,0.025,0.02]);
 handles.hedit_struggleL = uicontrol('Style','edit','String','-1',...
     'Units', 'normalized',        'Tag', 'edit_struggleL',...
-    'Position',[0.04,0.555,0.025,0.02]);
+    'Position',[0.04,0.59,0.025,0.02]);
 handles.hbutton_struggleSet = uicontrol('Style','pushbutton','String','Set',...
     'Units', 'normalized',        'Tag', 'button_struggleSet',...
     'Callback',{@button_moveSet,'Struggle'},...
-    'Position',[0.07,0.5675,0.04,0.02]);
+    'Position',[0.07,0.6025,0.04,0.02]);
 
 % Pole position
 handles.htext_poleposA = uicontrol('Style','text','String','Pole Anterior',...
     'Units', 'normalized',        'Tag', 'text_poleposA',...
-    'Position',[0.01,0.502,0.06,0.04], 'HorizontalAlignment', 'left');
+    'Position',[0.01,0.537,0.06,0.04], 'HorizontalAlignment', 'left');
 handles.hedit_poleposA = uicontrol('Style','edit','String','30',...
     'Units', 'normalized',        'Tag', 'edit_poleposA',...
-    'Position',[0.052,0.527,0.025,0.02]);
+    'Position',[0.052,0.562,0.025,0.02]);
 handles.htext_poleposP = uicontrol('Style','text','String','Pole Posterior',...
     'Units', 'normalized',        'Tag', 'text_poleposP',...
-    'Position',[0.01,0.500,0.06,0.02], 'HorizontalAlignment', 'left');
+    'Position',[0.01,0.535,0.06,0.02], 'HorizontalAlignment', 'left');
 handles.hedit_poleposP = uicontrol('Style','edit','String','100',...
     'Units', 'normalized',        'Tag', 'edit_poleposP',...
-    'Position',[0.052,0.502,0.025,0.02]);
+    'Position',[0.052,0.537,0.025,0.02]);
 handles.hbutton_poleposSet = uicontrol('Style','pushbutton','String','Set',...
     'Units', 'normalized',        'Tag', 'button_Polepos',...
     'Callback',{@button_moveSet,'Polepos'},...
-    'Position',[0.08,0.512,0.033,0.02]);
+    'Position',[0.08,0.547,0.033,0.02]);
 
 % load and save parameters (COM Port and Mice Name)
 handles.hbutton_saveParas = uicontrol('Style','pushbutton','String','Save Paras',...
     'Units', 'normalized',        'Tag', 'button_saveparas',...
     'Callback',@button_saveParas_Callback,...
-    'Position',[0.86,0.21,0.04,0.03]);
+    'Position',[0.945,0.5,0.04,0.03]);
 handles.hbutton_loadParas = uicontrol('Style','pushbutton','String','Load Paras',...
     'Units', 'normalized',        'Tag', 'button_loadparas',...
     'Callback',@button_loadParas_Callback,...
-    'Position',[0.86,0.16,0.04,0.03]);
+    'Position',[0.945,0.46,0.04,0.03]);
 
 
 % listbox for warnings
 handles.hwarnbox = uicontrol('Style','listbox',...
     'ForegroundColor', 'red',...
-    'Units', 'normalized','Position',[0.005 0.03 0.12 0.08]);
+    'Units', 'normalized','Position',[0.005 0.05 0.12 0.1]);
 handles.hbutton_deleteSelwarn = uicontrol('Style','pushbutton','String','Delete Sel',...
     'Units', 'normalized',        'Tag', 'button_deleteSelwarn',...
     'Callback',@button_deleteSelwarn_Callback,...
-    'Position',[0.08,0.005,0.04,0.02]);
+    'Position',[0.08,0.025,0.04,0.02]);
 handles.hbutton_clearAllwarn = uicontrol('Style','pushbutton','String','Clear All',...
     'Units', 'normalized',        'Tag', 'button_clearAllwarn',...
     'Callback',@button_clearAllwarn_Callback,...
-    'Position',[0.035,0.005,0.04,0.02]);
+    'Position',[0.035,0.025,0.04,0.02]);
 handles.htext_warnMsg = uicontrol('Style','text','String','Warning',...
     'Units', 'normalized',        'Tag', 'text_warnMsg',...
     'ForegroundColor', 'red',...
-    'Position',[0.035,0.11,0.06,0.015]);
+    'Position',[0.035,0.15,0.06,0.015]);
 
 % Create Timer to update GUI (background color and weight) periodically
 TimerInteval = 600;       % Default timer interval (10 min)
@@ -382,13 +398,13 @@ start(handles.serial_update_timer);
         % handles = guidata(source);
         Cage = get(source,'Tag');
         Cage_num = str2double(Cage);
-        if strcmp(get(source,'String'), 'open')
+        if strcmp(get(source,'String'), 'Open')
             % open com port
             str_com = handles.db_table{Cage_num}.COM;
             if strcmp(str_com(1:3), 'COM')
                 openOK=1;
                 for i_cage = 1:handles.total_cage_num
-                    if (i_cage ~= Cage_num) && strcmp(get(handles.hbutton_open(i_cage),'String'), 'close') && strcmp(handles.db_table{i_cage}.COM,str_com)
+                    if (i_cage ~= Cage_num) && strcmp(get(handles.hbutton_open(i_cage),'String'), 'Close') && strcmp(handles.db_table{i_cage}.COM,str_com)
                         msgbox([str_com ' is being used. Please choose another COM port']);
                         openOK=0;
                         break;
@@ -406,7 +422,7 @@ start(handles.serial_update_timer);
                         msgbox('Serial port open failed.');
                         return;
                     end
-                    set(source,'String','close');
+                    set(source,'String','Close');
                     
                     Mice = get(handles.hedit_mice(Cage_num),'String');
                     
@@ -462,7 +478,7 @@ start(handles.serial_update_timer);
                 disp('Close a Serial Port...');
                 disp(e);
             end
-            set(source,'String','open');
+            set(source,'String','Open');
             set(handles.htext_trailNum(Cage_num), 'String', 'Trial No.');
             set(handles.htext_perf100(Cage_num), 'String', '0%');
             set(handles.htext_Protocol(Cage_num), 'String', 'iProt - iTrial - 00%');
@@ -486,7 +502,7 @@ start(handles.serial_update_timer);
 % Plot buttons
     function button_plotPW_Callback(source,~)
         Cage_num = str2double(get(source,'Tag'));
-        if strcmp(get(handles.hbutton_open(Cage_num),'String'), 'open')
+        if strcmp(get(handles.hbutton_open(Cage_num),'String'), 'Open')
             msgbox(['The COM port of Cage ', num2str(Cage_num), ' is CLOSED!']);
             return;
         else
@@ -568,7 +584,7 @@ start(handles.serial_update_timer);
 % Open Message txt file
     function button_msg_Callback(source,~)
         Cage_num = get(source,'Tag');
-        if strcmp(get(handles.hbutton_open(str2double(Cage_num)),'String'), 'open')
+        if strcmp(get(handles.hbutton_open(str2double(Cage_num)),'String'), 'Open')
             msgbox(['The COM port of Cage ', Cage_num, ' is CLOSED!']);
             return;
         else
@@ -587,7 +603,7 @@ start(handles.serial_update_timer);
         else
             Cage_num = str2double(str{value});
         end
-        if strcmp(get(handles.hbutton_open(Cage_num),'String'), 'open')
+        if strcmp(get(handles.hbutton_open(Cage_num),'String'), 'Open')
             msgbox(['The COM port of Cage ', num2str(Cage_num), ' is CLOSED!']);
             return;
         end
@@ -762,7 +778,7 @@ function button_deleteSelwarn_Callback(~, ~)
         % determine which serial port and which cage
         com_port = get(obj, 'Port'); % 'Serial-COM7'
         for i_cage = 1:handles.total_cage_num
-            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close') && strcmp(handles.db_table{i_cage}.COM,com_port)
+            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'Close') && strcmp(handles.db_table{i_cage}.COM,com_port)
                 break;
             end
         end
@@ -823,6 +839,7 @@ function button_deleteSelwarn_Callback(~, ~)
                 end
                 
             case 'W' % weight 
+                %if ((size(A,2))>=163)
                 try
                     indT=handles.localdata{i_cage}.ind;
                     handles.localdata{i_cage}.weight(indT,1)=now;
@@ -838,11 +855,13 @@ function button_deleteSelwarn_Callback(~, ~)
                     handles.localdata{i_cage}.ind = indT;
                 catch e
                     disp('Serial Callback-Weight');
-                    disp(size(A));
-                    disp(e);
+                    disp([size(A,2) i_cage ]);
+                    disp(datetime(now,'ConvertFrom','datenum'));
+                    %disp(e);
                 end
-                %disp('Weight-end');
-                
+%                  disp('Weight-end');
+                %end
+
             case 'E' % error msg
                 try
                     existingItems = get(handles.hlistbox, 'String');    % get current listbox list
@@ -913,23 +932,21 @@ function button_deleteSelwarn_Callback(~, ~)
                     disp(e);
                 end
                 
-            case 'B' % warning
-                %if (A(2)==':')
-                if (A(4)=='p')
-                    try
-                        existingItems = get(handles.hwarnbox, 'String');    % get current listbox list
-                        n_items = length(existingItems);
-                        existingItems{n_items+1} = ['Cage ',num2str(i_cage),': ',A(4:end),' (',datestr(now),')'];
-                        set(handles.hwarnbox, 'String', existingItems);
-                        set(handles.hwarnbox, 'Value', n_items+1);
-                        fprintf(handles.fileID(i_cage),[A(4:end) '\n']);
-                    catch e
-                        disp('Serial Callback-Error');
-                        disp(e);
-                    end
-                    clear existingItems;
+            case 'Q' % warning              
+                try
+                    existingItems = get(handles.hwarnbox, 'String');    % get current listbox list
+                    n_items = length(existingItems);
+                    existingItems{n_items+1} = ['Cage ',num2str(i_cage),': ',A(4:end),' (',datestr(now),'Q)'];
+                    set(handles.hwarnbox, 'String', existingItems);
+                    set(handles.hwarnbox, 'Value', n_items+1);
+                    fprintf(handles.fileID(i_cage),[A(4:end) '\n']);
+                catch e
+                    disp('Serial Callback-Warning');
+                    disp([size(A,2) i_cage ]);
+                    %disp(e);
                 end
-            
+                clear existingItems;
+                              
             otherwise
                 try
                     fprintf(handles.fileID(i_cage),[A(4:end) '\n']);
@@ -947,7 +964,7 @@ function button_deleteSelwarn_Callback(~, ~)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     function serialTimer(~, ~)     
         for i_cage = 1:handles.total_cage_num
-            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close')
+            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'Close')
                 %disp(['serialTimer' num2str(i_cage) all_serialPorts]);
                 try
                     getpinstatus(handles.s{i_cage});
@@ -962,7 +979,7 @@ function button_deleteSelwarn_Callback(~, ~)
                         eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt']);
                     end
                     
-                    set(handles.hbutton_open(i_cage),'String','open');
+                    set(handles.hbutton_open(i_cage),'String','Open');
                     set(handles.htext_trailNum(i_cage), 'String', 'Trial No.');
                     set(handles.htext_perf100(i_cage), 'String', '0%');
                     set(handles.htext_Protocol(i_cage), 'String', 'iProt - iTrial - 00%');
@@ -979,7 +996,7 @@ function button_deleteSelwarn_Callback(~, ~)
 
     function updateGUI(~, ~)
         for i_cage = 1:handles.total_cage_num
-            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close')
+            if strcmp(get(handles.hbutton_open(i_cage),'String'), 'Close')
                 % update days
                 set(handles.htext_days(i_cage),'String',sprintf('%2.1f days',now - handles.db_table{i_cage}.startDate));
                 
@@ -1043,7 +1060,7 @@ function button_deleteSelwarn_Callback(~, ~)
                     delete(timerfind);
                     for i_cage = 1:handles.total_cage_num
                         %disp(['closeGUI' num2str(i_cage)]);
-                        if strcmp(get(handles.hbutton_open(i_cage),'String'), 'close')
+                        if strcmp(get(handles.hbutton_open(i_cage),'String'), 'Close')
                             try
                                 fclose(handles.fileID(i_cage)); % close file object
                                 delete(handles.s{i_cage});  % close serial port

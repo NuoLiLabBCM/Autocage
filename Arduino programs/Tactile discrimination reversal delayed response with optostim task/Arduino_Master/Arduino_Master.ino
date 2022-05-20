@@ -137,8 +137,15 @@ bool headfixation_again             = 0;
 int regulatorVal_step    = 10;  // not used
 int regulatorVal_min     = 150; // start with a small pressure
 int regulatorVal_max     = 255; // max pressure
-int regulatorVal_release = 30;  // slightly release to reduce retract distance and noise
+int regulatorVal_release = 10; //30;  // slightly release to reduce retract distance and noise
 
+int polePos;
+int poleLastPos;
+int portMotorPos = A0;
+bool isMotorOK = 1;   
+int failureCont = 0;
+int failureMax = 5;
+int lastFailure = 0;   
 
 /****************************************************************************************************/
 /************************************* Finite State Matrix related **********************************/
@@ -330,6 +337,7 @@ bool Receiving_data_from_Bpod  = 0;
 bool sdcard = 0;
 
 byte Earlylick100	= 0;
+byte response_trial = 100;
 
 unsigned long last_reward_time = 0;
 int timed_drop_count = 0;
@@ -343,7 +351,7 @@ byte state_visited[1024] = {};
 uint16_t nTransition;
 
 byte trial_stim_index = 0; // 0:no_stim; 1:delay_stim; 2:sample_stim; etc.
-byte weightByte = 100;
+byte weightByte = 10;
 
 byte contingency = 0;
 unsigned int contingency_trial = 0;
@@ -380,6 +388,7 @@ void watchdogSetup(void)
 
 void setup() {
   isStruck = 0;
+  isMotorOK = 1;
 
   watchdogEnable(watchdogTime);
 
@@ -512,6 +521,8 @@ void loop() {
     if (sdcard == 0) {
       sdcard = 1;
       SD.begin(chipSelect);
+	  read_SD_para_F();
+	  read_SD_para_S();
     }
   } else {
     if (sdcard == 1) {
@@ -523,7 +534,7 @@ void loop() {
   }
 
   // if (Rocker_switch is ON && SD card inserted), run the state matrix
-  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0) {
+  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0 && isMotorOK==1) {
 
     if (paused == 1) {
       paused = 0;
@@ -805,7 +816,13 @@ void loop() {
       case 'P':  // Motor Pole; 0-255; 30 is anterior, 100 is posterior
         dataByte = SerialUSBReadByte();
         analogWrite(portMotorPole, dataByte);
-        // delay(500);
+        delay(1000);
+		analogReadResolution(12);
+		polePos = analogRead(portMotorPos);
+		if (SerialUSB.dtr() && SerialUSB_connected()) {
+			SerialUSB.print("M: pole Position: ");
+			SerialUSB.println(polePos);
+		}
         break;
       case 'f': // update motor F/B final position
         dataByte = SerialUSBReadByte();
@@ -883,7 +900,7 @@ void loop() {
         S.anteriorPos = buffer_tmp.toInt();
         buffer_tmp = SerialUSB.readStringUntil('\n');
         S.posteriorPos = buffer_tmp.toInt();
-		halfPos = (S.anteriorPos + S.posteriorPos)/2;
+		//halfPos = (S.anteriorPos + S.posteriorPos)/2;
         write_SD_para_S();
         break;
       case 'A': //
@@ -1173,18 +1190,6 @@ int send_protocol_to_Bpod_and_Run() {
 
         MovePole(S.TrialType); // 2 sec
 
-        /* //no auto reward during optostim
-            //otherwise the response optostim will be problematic!
-          // Determine if give free water reward
-          String ActionAfterCue;
-          if (S.TrialType == 0 && S.GaveFreeReward.flag_R_water == 1) {
-          ActionAfterCue = "GiveRightDrop";
-          } else if (S.TrialType == 1 && S.GaveFreeReward.flag_L_water == 1) {
-          ActionAfterCue = "GiveLeftDrop";
-          } else {
-          ActionAfterCue = "AnswerPeriod";
-          }
-        */
         String ActionAfterCue;
         ActionAfterCue = "AnswerPeriod";
 
@@ -1210,70 +1215,41 @@ int send_protocol_to_Bpod_and_Run() {
         OutputAction GiveRightDrop_Output[1]   = {RightWaterOutput};
         OutputAction GiveLeftDrop_Output[1]    = {LeftWaterOutput};
         OutputAction Reward_Output[1]          = {RewardOutput};
+		OutputAction RewardStim_Output[2]      = {RewardOutput, OptogeneticTrig};
         OutputAction NoOutput[0]               = {};
         OutputAction OptoStim_Output[1]        = {OptogeneticTrig}; // new to Stim protocol
 
         State states[16] = {};
         states[0]  = CreateState("TrigTrialStart",    0.1,                      1, TrigTrialStart_Cond,  1, TrigTrialStart_Output);
 
-        if (reverse_num > 2 && optostim_num == 1) {  // starting optostim from 3rd reversal
-		
-		  // optostim_num =  	
-          // int randomNum = random(300);
-          // if (randomNum < 150) {
-          //  weightByte = 10;  // percent power level: 10%
-          //} else if (randomNum < 300) {
-          //  weightByte = 50; // percent power level: 50%
-          //} else {
-          weightByte = 100; // percent power level: 100%
-          //}
-
-          byte laserByte = 2; // 1-Thorlab; 2-UltraLaser
+        if (reverse_num > 2 && optostim_num == 1) {  // starting optostim from 3rd reversal	 
+          weightByte = 10; // percent power level: 100%
+        
+          //byte laserByte = 2; // 1-Thorlab; 2-UltraLaser
 
           Serial2.write(weightByte);
-          Serial2.write(laserByte);
-
-          //randomNum = random(300); // only sample and response stim
-		  // optostim across the whole epochs (sample, delay, response) | 100 trials w/o stim <-> 100 trials w/ stim
+          //Serial2.write(laserByte);
          
-            states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    2, Sample_Pole_Stim_Output);
-            states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 2, Sample_Pole_Stim_Output);
-            states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     1, OptoStim_Output);
-            states[4]  = CreateState("EarlyLickDelay",    0.05,                     1, EarlyLickDelay_Cond,  1, OptoStim_Output);
-            states[5]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     2, ResponseCueStim_Output);
-            states[6]  = CreateState("GiveRightDrop",     Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveRightDrop_Output);
-            states[7]  = CreateState("GiveLeftDrop",      Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveLeftDrop_Output);
-            states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    1, OptoStim_Output);
-            // mark this trial as stim trial...sample
-            trial_stim_index = weightByte + 1; // 11, 31, 51, 71, 101
-			
-        //  } else if (optostim_num == 1) {// 1/3 delay
-        //    states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
-        //    states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
-        //    states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     1, OptoStim_Output);
-        //    states[4]  = CreateState("EarlyLickDelay",    0.05,                     1, EarlyLickDelay_Cond,  1, OptoStim_Output);
-        //    states[5]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     1, ResponseCue_Output);
-        //    states[6]  = CreateState("GiveRightDrop",     Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveRightDrop_Output);
-        //    states[7]  = CreateState("GiveLeftDrop",      Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveLeftDrop_Output);
-        //    states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    0, NoOutput);
-        //    // mark this trial as stim trial...delay
-        //    trial_stim_index = weightByte + 2; // 12, 32, 52, 72, 102
-        //  } else {// 1/3 response
-        //    states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
-        //    states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
-        //    states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
-        //    states[4]  = CreateState("EarlyLickDelay",    0.05,                     1, EarlyLickDelay_Cond,  0, NoOutput);
-        //    states[5]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     2, ResponseCueStim_Output);
-        //    states[6]  = CreateState("GiveRightDrop",     Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveRightDrop_Output);
-        //    states[7]  = CreateState("GiveLeftDrop",      Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveLeftDrop_Output);
-        //    states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    1, OptoStim_Output);
-        //    // mark this trial as stim trial...response
-        //   trial_stim_index = weightByte + 3; // 13, 33, 53, 73, 103
-        //  }
-        }
-        else { // Control trial
+          states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
+          states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
+          states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
+          states[4]  = CreateState("EarlyLickDelay",    0.05,                     1, EarlyLickDelay_Cond,  0, NoOutput);
+          states[5]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     1, ResponseCue_Output);
+          states[6]  = CreateState("GiveRightDrop",     Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveRightDrop_Output);
+          states[7]  = CreateState("GiveLeftDrop",      Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveLeftDrop_Output);
+          states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    1, OptoStim_Output);
+		  states[9]  = CreateState("Reward",            Reward_duration_behavior, 1, Reward_Cond,          2, RewardStim_Output);
+		  states[10] = CreateState("RewardConsumption", ConsumptionPeriod,        1, Tup_StopLicking_Cond, 1, OptoStim_Output);
+		  states[11] = CreateState("NoResponse",        0.002,                    1, Tup_StopLicking_Cond, 1, OptoStim_Output);
+		  states[12] = CreateState("TimeOut",           S.TimeOut,                1, Tup_StopLicking_Cond, 1, OptoStim_Output);
+		  states[13] = CreateState("StopLicking",       StopLickingPeriod,        3, StopLicking_Cond,     1, OptoStim_Output);
+		  states[14] = CreateState("StopLickingReturn", 0.01,                     1, Tup_StopLicking_Cond, 1, OptoStim_Output);
+		  states[15] = CreateState("TrialEnd",          0.05,                     1, TrialEnd_Cond,        0, NoOutput);
+          // mark this trial as stim trial...sample
+          trial_stim_index = weightByte + 1; // 11, 31, 51, 71, 101			
+       }else { // Control trial
           Serial2.write(byte(0));
-          Serial2.write(byte(2));
+          //Serial2.write(byte(2));
           states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
           states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
           states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
@@ -1282,16 +1258,17 @@ int send_protocol_to_Bpod_and_Run() {
           states[6]  = CreateState("GiveRightDrop",     Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveRightDrop_Output);
           states[7]  = CreateState("GiveLeftDrop",      Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveLeftDrop_Output);
           states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    0, NoOutput);
+		  states[9]  = CreateState("Reward",            Reward_duration_behavior, 1, Reward_Cond,          1, Reward_Output);
+		  states[10] = CreateState("RewardConsumption", ConsumptionPeriod,        1, Tup_StopLicking_Cond, 0, NoOutput);
+		  states[11] = CreateState("NoResponse",        0.002,                    1, Tup_StopLicking_Cond, 0, NoOutput);
+		  states[12] = CreateState("TimeOut",           S.TimeOut,                1, Tup_StopLicking_Cond, 0, NoOutput);
+		  states[13] = CreateState("StopLicking",       StopLickingPeriod,        3, StopLicking_Cond,     0, NoOutput);
+		  states[14] = CreateState("StopLickingReturn", 0.01,                     1, Tup_StopLicking_Cond, 0, NoOutput);
+		  states[15] = CreateState("TrialEnd",          0.05,                     1, TrialEnd_Cond,        0, NoOutput);
           // mark this trial as NON-stim (Control) trial
           trial_stim_index = 0;
         }
-        states[9]  = CreateState("Reward",            Reward_duration_behavior, 1, Reward_Cond,          1, Reward_Output);
-        states[10] = CreateState("RewardConsumption", ConsumptionPeriod,        1, Tup_StopLicking_Cond, 0, NoOutput);
-        states[11] = CreateState("NoResponse",        0.002,                    1, Tup_StopLicking_Cond, 0, NoOutput);
-        states[12] = CreateState("TimeOut",           S.TimeOut,                1, Tup_StopLicking_Cond, 0, NoOutput);
-        states[13] = CreateState("StopLicking",       StopLickingPeriod,        3, StopLicking_Cond,     0, NoOutput);
-        states[14] = CreateState("StopLickingReturn", 0.01,                     1, Tup_StopLicking_Cond, 0, NoOutput);
-        states[15] = CreateState("TrialEnd",          0.05,                     1, TrialEnd_Cond,        0, NoOutput);
+        
 	
         // Predefine State sequence.
         for (int i = 0; i < 16; i++) {
@@ -1324,6 +1301,7 @@ int send_protocol_to_Bpod_and_Run() {
 
 
 void MovePole(byte trial_type) {
+  poleLastPos = analogRead(portMotorPos);
   // halfPos, anteriorPos, posteriorPos, finalPos
   switch (trial_type) {
     case 0: // right
@@ -1348,16 +1326,48 @@ void MovePole(byte trial_type) {
       }
       break;
   }
+  halfPos = (S.anteriorPos + S.posteriorPos) / 2;
   analogWrite(portMotorPole, halfPos);
-  delay(750);
+  delay(1000);
+  
+  analogReadResolution(12);
+  polePos = analogRead(portMotorPos);
+  
   analogWrite(portMotorPole, finalPos);
-  delay(750);
+  delay(1000);
   
   if (SerialUSB.dtr() && SerialUSB_connected()) {
 	SerialUSB.print("M: pole half/final Position: ");
 	SerialUSB.print(halfPos);
 	SerialUSB.print("/");
 	SerialUSB.println(finalPos);
+	
+	SerialUSB.print("M: pole motor last/curr Position: ");
+	SerialUSB.print(poleLastPos);
+	SerialUSB.print("/");
+	SerialUSB.println(polePos);
+  }
+	
+  if (abs(polePos-poleLastPos) < 50) {
+	lastFailure=1;
+  }else{	
+	lastFailure=0;
+  }
+	
+  if (lastFailure ==1) {
+	failureCont++;
+  }else{
+	failureCont = 0;
+  }
+			
+  if (failureCont >= failureMax) {
+	failureCont = 0;
+	isMotorOK = 0;
+	lastFailure = 0;
+	write_SD_para_S();
+	if (SerialUSB.dtr() && SerialUSB_connected()) {
+		SerialUSB.println("Q: pole motor has problem ");
+	}
   }
 }
 
@@ -1639,7 +1649,7 @@ int UpdatePerformance() {
 
   Perf100 = 0;
   Earlylick100 = 0;
-  byte response_trial = 100;
+  response_trial = 100;
   for (int i = 0; i < RECORD_TRIALS; i++) {
     if (S.OutcomeHistory[i] == 0) {
       response_trial = response_trial - 1;
@@ -2028,12 +2038,14 @@ int autoChangeProtocol() {
       }
       contingency_trial = contingency_trial + 1;
 	  contingency_trial_100 = contingency_trial_100 + 1;
-      SerialUSB.print("M: contingency: ");
-      SerialUSB.print(contingency);
-      SerialUSB.print("; contingency_trial: ");
-      SerialUSB.print(contingency_trial);
-      SerialUSB.print("; contingency_trial_100: ");
-      SerialUSB.println(contingency_trial_100);
+	  if (SerialUSB.dtr() && SerialUSB_connected()) {
+		SerialUSB.print("M: contingency: ");
+		SerialUSB.print(contingency);
+		SerialUSB.print("; contingency_trial: ");
+		SerialUSB.print(contingency_trial);
+		SerialUSB.print("; contingency_trial_100: ");
+		SerialUSB.println(contingency_trial_100);
+	  }
 	  
 	  if (contingency_trial_100 == 100) {
 		  contingency_trial_100 = 0;
@@ -2044,7 +2056,7 @@ int autoChangeProtocol() {
 		  }
 	  }
 	  
-      if (contingency_trial > 300 && Perf100 > 75 && Earlylick100 < 50) {
+      if (contingency_trial > 300 && Perf100 > 95 && Earlylick100 < 50 && response_trial > 80) {
         contingency_trial = 0;
 		contingency_trial_100 = 0;
 		optostim_num = 0;
@@ -2055,8 +2067,10 @@ int autoChangeProtocol() {
           contingency = 0;
         }
         reverse_num = reverse_num + 1;
-        SerialUSB.print("M: contingency changed to: ");
-        SerialUSB.println(contingency);
+		if (SerialUSB.dtr() && SerialUSB_connected()) {
+			SerialUSB.print("M: contingency changed to: ");
+			SerialUSB.println(contingency);
+		}
 		
       }
       break;
@@ -2902,6 +2916,9 @@ int write_SD_para_S() {
     dataFile.println(reverse_num);
 	dataFile.print("optostim_num = ");
     dataFile.println(optostim_num);
+	
+	dataFile.print("is_motor_ok = ");
+    dataFile.println(isMotorOK);
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for write");
@@ -3066,6 +3083,10 @@ int read_SD_para_S() {
 	buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     optostim_num = buffer_tmp.toInt();
+	
+	buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    isMotorOK = buffer_tmp.toInt();
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for read");

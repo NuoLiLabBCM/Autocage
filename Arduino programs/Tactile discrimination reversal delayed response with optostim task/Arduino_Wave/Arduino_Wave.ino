@@ -73,7 +73,7 @@ const uint16_t ultra_ramp_sine[200] = {4064, 4007, 3924, 3818, 3689, 3540, 3373,
 
 byte weightByte = 100;
 float powerWeight = 1.0;
-byte laserByte = 1; // 1-using thorlab laser; 2-using Ultra laser
+//byte laserByte = 2; // 1-using thorlab laser; 2-using Ultra laser
 byte led_state = LOW;
 byte stimpin_state = 0;
 
@@ -105,6 +105,9 @@ void setup() {
 
   Timer4.attachInterrupt(timer_updateDAC); //
   Timer4.setPeriod(500); // every 0.5 ms to update DAC value
+  
+  Timer5.attachInterrupt(timer_wait_inter_trial); //
+  Timer5.setPeriod(500000); // inter-trial interval is ~2s
 
   // For Adafruit MCP4725A1 the address is 0x62 (default) or 0x63 (ADDR pin tied to VCC)
   // For MCP4725A0 the address is 0x60 or 0x61
@@ -124,9 +127,8 @@ void loop() {
       digitalWriteDirect(ledPin, led_state);
     }
     weightByte = Serial2.read();
-    powerWeight = (float)weightByte / 100;
-    while(Serial2.available()==0){};
-    laserByte = Serial2.read();
+	powerWeight = (float)weightByte / 100;
+	
     //SerialUSB.println(weightByte);
     //SerialUSB.println(laserByte);
   }
@@ -139,17 +141,6 @@ void MaskFlash() {
     pwm_pin53.start(PWM_PERIOD_PIN_53, PWM_DUTY_PIN_53);
     Timer3.start();
   }
-  /*
-    else
-    { // falling
-    //SerialUSB.println("mask falling");
-    //digitalWriteDirect(ledPin, LOW);
-    pwm_pin53.stop();
-    Timer3.stop();
-    pinMode(flashOutputPin, OUTPUT);
-    digitalWrite(flashOutputPin, LOW);
-    }
-  */
 }
 
 void flash5sec_handler() {
@@ -165,72 +156,49 @@ void OptoStim() {
     //SerialUSB.println("OptostimPin rising");
     //digitalWriteDirect(ledPin, HIGH);
     sample_ind = 0; // first output
-    if (laserByte == 1) {
-      dac.setVoltage(uint16_t(powerWeight * thorlab_flat_sine[0]), false);
-    } else {
-      dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[0] - 655) + 655), false); // 655 is 0.8 V
-    }
+    
+    //dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[0] - 655) + 655), false); // 655 is 0.8 V
+	dac.setVoltage(0, false);
+	
     Timer4.start();
 	stimpin_state =1;
   }
   else { // falling
-    //SerialUSB.println("OptostimPin falling");
-    //digitalWriteDirect(ledPin, LOW);
-    //Timer4.stop();
-    //dac.setVoltage(0, false); // output 0
-	stimpin_state =0;
-	sample_ind = 0;
+    //SerialUSB.println("OptostimPin falling");   
+	Timer5.start();
   } 
 
 }
 
+void timer_wait_inter_trial() {
+	//SerialUSB.println("Timer5 stop");
+	Timer5.stop();
+	stimpin_state =0;
+	sample_ind = 0;
+}
+
 void timer_updateDAC() { // total 1.3 sec stim
   sample_ind ++;
-  if (laserByte == 1) { // Thorlab laser
-    if (sample_ind < 2400) { // flat cos, 1.2 sec
-      dac.setVoltage(uint16_t(powerWeight * thorlab_flat_sine[sample_ind % 50]), false);
-    } else if (sample_ind < 2600) { // ramp down, 0.1 sec
-      dac.setVoltage(uint16_t(powerWeight * thorlab_ramp_sine[sample_ind - 2400]), false);
-    } else {
-      Timer4.stop();
-      dac.setVoltage(0, false);
-    }
-  } else { // Ultra laser
-    if (stimpin_state ==1) {
-      dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[sample_ind % 50] - 655) + 655), false); // 655 is 0.8 V
-    } else {
+  
+    if (stimpin_state ==1 && sample_ind == 200) {
+		stimpin_state =2;
+		sample_ind =0;
+		dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[0] - 655) + 655), false);
+	}
+	
+	if (stimpin_state ==2) {	
+      dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[sample_ind % 50] - 655) + 655), false); 	  
+    } 
+	
+	if (stimpin_state ==0){		
 		if (sample_ind < 200) { // ramp down, 0.1 sec
           dac.setVoltage(uint16_t(powerWeight * (ultra_ramp_sine[sample_ind] - 655) + 655), false); // 655 is 0.8 V
         } else {
           Timer4.stop();
           dac.setVoltage(0, false);
         }
-	}
-  }
+	} 
 }
-
-/*void timer_updateDAC() { // total 1.3 sec stim
-  sample_ind ++;
-  if (laserByte == 1) { // Thorlab laser
-    if (sample_ind < 2400) { // flat cos, 1.2 sec
-      dac.setVoltage(uint16_t(powerWeight * thorlab_flat_sine[sample_ind % 50]), false);
-    } else if (sample_ind < 2600) { // ramp down, 0.1 sec
-      dac.setVoltage(uint16_t(powerWeight * thorlab_ramp_sine[sample_ind - 2400]), false);
-    } else {
-      Timer4.stop();
-      dac.setVoltage(0, false);
-    }
-  } else { // Ultra laser
-    if (sample_ind < 2400) { // flat cos, 1.2 sec
-      dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[sample_ind % 50] - 655) + 655), false); // 655 is 0.8 V
-    } else if (sample_ind < 2600) { // ramp down, 0.1 sec
-      dac.setVoltage(uint16_t(powerWeight * (ultra_ramp_sine[sample_ind - 2400] - 655) + 655), false); // 655 is 0.8 V
-    } else {
-      Timer4.stop();
-      dac.setVoltage(0, false);
-    }
-  }
-}*/
 
 void digitalWriteDirect(int pin, boolean val) {
   if (val) g_APinDescription[pin].pPort -> PIO_SODR = g_APinDescription[pin].ulPin;
