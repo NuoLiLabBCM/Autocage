@@ -373,6 +373,12 @@ unsigned long unix_time_24;
 
 bool isStruck = 0;
 
+int isHandshake = 0;        	//0:handshake failed; 1:handshake success
+int checkHandshake = 0;     	//0:need to do handshake
+unsigned long bpod_time = 0;  	//StateMatrix running startpoint
+float serial1Timeout = 30000;   //after StateMatrix starting, timeout (ms) for serial1 not getting data back from task board. 
+int usbWflag = 0;               //0:message/warning needs to write to USB serial port.
+
 //watchdog
 int watchdogTime = 10000;  //10s
 
@@ -389,6 +395,8 @@ void watchdogSetup(void)
 void setup() {
   isStruck = 0;
   isMotorOK = 1;
+  checkHandshake = 0;
+  usbWflag=0;
 
   watchdogEnable(watchdogTime);
 
@@ -496,7 +504,7 @@ void setup() {
   scale.set_scale(calibration_factor);
 
   // Handshake with Bpod; get stuck and keep trying if failed
-  handshake_with_bpod();
+  //handshake_with_bpod();
 
   Timer4.attachInterrupt(Incase_handler); // in case receiving Bpod data struck
   Timer4.setPeriod(5000000); // Runs  5 sec later to check if get struck
@@ -532,9 +540,23 @@ void loop() {
       }
     }
   }
+  
+  if (checkHandshake == 0){
+	checkHandshake = 1;
+	handshake_with_bpod();
+  }
+	
+  if (SerialUSB.dtr() && SerialUSB_connected() && usbWflag==0) {
+	usbWflag=1;
+	if (isHandshake){
+		SerialUSB.println("E: handshake successful!");
+	}else{
+		SerialUSB.println("Q: handshake failed!");
+	}	
+  }
 
   // if (Rocker_switch is ON && SD card inserted), run the state matrix
-  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0 && isMotorOK==1) {
+  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0 && isMotorOK==1 && isHandshake==1) {
 
     if (paused == 1) {
       paused = 0;
@@ -609,7 +631,15 @@ void loop() {
       //        delay(1000);             // additional inter-trial interval
       //      }
       //////////// for next trial ///////////
-    }
+    } else {
+		if (millis()-bpod_time > serial1Timeout && protocol_sent == 1){
+			 checkHandshake = 0;
+			 protocol_sent = 0;
+			 if (SerialUSB.dtr() && SerialUSB_connected()) {
+				SerialUSB.println("M: need to check handshake");
+			 }
+		}
+	}
 
     if (millis() - last_reward_time > 3 * 3600000) { // there is no reward in last 3 hours
       // free reward to fill the lickport tube
@@ -924,11 +954,14 @@ void loop() {
 /****************************************************************************************************/
 
 int send_protocol_to_Bpod_and_Run() {
-  StateMatrix sma;                  // predefine the state matrix (sent later to Bpod)
+  StateMatrix sma;   // predefine the state matrix (sent later to Bpod)
+  
+  serial1Timeout = 30000;
+  
   switch (S.ProtocolType) {
     // PROTOCOL 1: teaching animal to headfixation, which are universal to all behaviour tasks
     case P_FIXATION: { // Lick and Rectract until Switch Triggered, then increasing headfixation duration gradually
-
+		 serial1Timeout =3630000;
         //        // random pole out 100%
         //        if (random(100) < 0) {
         //          PoleOutput_left  = {"BNCState", 0};
@@ -1293,6 +1326,9 @@ int send_protocol_to_Bpod_and_Run() {
   // Send 'R' to Bpod to run the state machine
   RunStateMatrix();
   protocol_sent = 1;
+  
+  bpod_time = millis();
+  
   if (SerialUSB.dtr() && SerialUSB_connected()) {
     SerialUSB.println("M: Bpod Running...");
   }
@@ -3776,28 +3812,33 @@ void printCurrentTime() {
 }
 
 void handshake_with_bpod() {
-  int isHandshake = 0;
+  int HSNum = 0;
+  isHandshake = 0;
+  usbWflag=0;
   while (!isHandshake) {
     watchdogReset();
     Serial1.write('6'); // handshake with Bpod
     delay(100);
     while (!Serial1.available()) {
+	  watchdogReset();
+	  HSNum++;
       if (SerialUSB.dtr() && SerialUSB_connected()) {
         SerialUSB.println("E: Trying to handshake with Bpod...");
       }
-      delay(5000);
-      Serial1.write('6');
-      delay(100);
+	  if (HSNum < 5) {
+		delay(5000);
+		Serial1.write('6');
+		delay(100);
+	  }else{		
+		break;
+	  }
     }
     if (Serial1.read() != '5') {
-      //SerialUSB.println("E: handshake failed! Check.");
       while (Serial1.available()) {
         Serial1.read();
       }
+	  break;
     } else {
-      if (SerialUSB.dtr() && SerialUSB_connected()) {
-        SerialUSB.println("M: handshake successful.");
-      }
       ledState = HIGH;
       digitalWrite(ledPin, ledState);
       isHandshake = 1;
