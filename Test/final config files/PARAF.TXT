@@ -8,3 +8,4 @@ last_advance_threshold_counter = 3084
 headfixation_counter = 3133
 fixation_interval_max = 60000
 weight_offset = 0
+calibration_factor = 1

@@ -110,6 +110,7 @@ float calibration_factor = -12300; // by default -12300.
 float weighting_info[40] = {0}; // weighting info in last 2 sec
 int weight_counter       = 0;
 long weight_offset    = 0;
+float knownWeight = 20;  //g
 
 boolean SwitchL_LastStatus;
 boolean SwitchR_LastStatus;
@@ -588,6 +589,9 @@ void loop() {
       valve_control(3); //  open valve 1 and 2
       delay(100);
       valve_control(0); // close valve 1 and 2
+	  
+	  scale.set_offset(weight_offset);
+	  scale.set_scale(calibration_factor);
 
       timer_state = CHECK_TRIG;
     }
@@ -915,8 +919,14 @@ void loop() {
         scale.set_scale();
         scale.tare();  //Reset the scale to 0
         weight_offset = scale.get_offset();
-        scale.set_scale(calibration_factor);
         write_SD_para_F();
+        break;
+	  case 'G': //get the scale calibration_factor
+		buffer_tmp = SerialUSB.readStringUntil('\n');
+		knownWeight = buffer_tmp.toFloat();
+		calibration_factor = (scale.read_average()-weight_offset)/knownWeight;
+        scale.set_scale(calibration_factor);
+		write_SD_para_F();
         break;
       case 'S': //set Struggle threshold
         buffer_tmp = SerialUSB.readStringUntil('\n');
@@ -2773,6 +2783,9 @@ int write_SD_para_F() {
 
     dataFile.print("weight_offset = ");
     dataFile.println(weight_offset);
+	
+	dataFile.print("calibration_factor = ");
+    dataFile.println(calibration_factor);
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraF.txt for write");
@@ -2824,6 +2837,10 @@ int read_SD_para_F() {
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     weight_offset = buffer_tmp.toInt();
+	
+	buffer_tmp = dataFile.readStringUntil('=');
+    buffer_tmp = dataFile.readStringUntil('\n');
+    calibration_factor = buffer_tmp.toFloat();
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraF.txt for read");

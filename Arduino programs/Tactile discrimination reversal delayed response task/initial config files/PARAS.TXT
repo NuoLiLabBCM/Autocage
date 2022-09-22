@@ -30,3 +30,4 @@ contingency_trial = 0
 pole_anterior_position = 30
 pole_posterior_position = 100
 is_motor_ok = 1
+reverse_num = 0
