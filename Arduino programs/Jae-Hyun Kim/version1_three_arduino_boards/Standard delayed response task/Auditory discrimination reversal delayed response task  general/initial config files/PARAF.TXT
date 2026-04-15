@@ -1,0 +1,10 @@
+trig_counter = 0
+fixation_duration = 3000
+last_advance_headfixation_counter = 0
+Fixation_Outcome = 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 0; 
+struggle_thres_neg = -1
+struggle_thres_pos = 32
+last_advance_threshold_counter = 0
+headfixation_counter = 0
+fixation_interval_max = 30000
+weight_offset = 0
