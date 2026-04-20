@@ -127,7 +127,7 @@ bool headfixation_again             = 0;
 
 int regulatorVal_step    = 10;  // not used
 int regulatorVal_min     = 150; // start with a small pressure
-int regulatorVal_max     = 255; // max pressure
+int regulatorVal_max     = 210;//255; // max pressure
 int regulatorVal_release = 10; //30;  // slightly release to reduce retract distance and noise
 
 int polePos;

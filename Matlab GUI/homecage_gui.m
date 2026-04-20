@@ -11,11 +11,13 @@ function homecage_gui(varargin)
 %
 %       Created on                 09/15/2018   by Y.H.
 %       Last modified on           09/06/2020   by Y.H.
-%       modified to ver1.0 on      11/30/2020
-%       modified to display 40 cages      12/14/2021
+%       modified to ver1.0 on      11/30/2020   by JL
+%       modified to display 40 cages      12/14/2021   by JL
+%       modified to display (i+1)~(i+40) cage    9/5/2024  by JL
 
 %% GUI preparation
 global handles
+handles.init_cage = 0;
 handles.total_cage_num = 40;
 handles.default_color = [.7 .9 .8];  % default background color [.93 .93 .93];
 handles.trial_24 = [];
@@ -36,6 +38,7 @@ lenJ = 8;
 for ii= 1:lenI
     for jj= 1:lenJ
         cage_i= lenJ *(ii-1) + jj;
+        cage_i_label =cage_i + handles.init_cage;
         pos(cage_i,1) = deltw * (jj+0.45);
         pos(cage_i,2) = delth * (lenI-ii+0.4);
         pos(cage_i,3) = deltw-0.02;
@@ -47,8 +50,8 @@ for ii= 1:lenI
     
     % Current supplot panel posititon
     pos(cage_i,:) = get(handles.hsubplot(cage_i), 'Position'); 
-    if ~exist(['./Data/Cage',int2str(cage_i),'/YH00'], 'dir')
-        mkdir(['./Data/Cage',int2str(cage_i)],'/YH00');
+    if ~exist(['./Data/Cage',int2str(cage_i_label),'/YH00'], 'dir')
+        mkdir(['./Data/Cage',int2str(cage_i_label)],'/YH00');
     end
     % db_table stores each cage's Number, COM port, Mice name, startDate
     handles.db_table{cage_i}.Cage = cage_i;
@@ -57,7 +60,7 @@ for ii= 1:lenI
     handles.db_table{cage_i}.COM = 'NaN';
     
     % Title (cage number)
-    handles.htext_title(cage_i) = uicontrol('Style','text','String',['Cage ',int2str(cage_i),' - '],...
+    handles.htext_title(cage_i) = uicontrol('Style','text','String',['Cage ',int2str(cage_i_label),' - '],...
         'Units', 'normalized',        'Tag', num2str(cage_i),...
         'FontSize',11, 'FontWeight','bold',...
         'Position',[pos(cage_i,1),pos(cage_i,2)+0.142,0.04,0.02]);
@@ -195,7 +198,7 @@ handles.htext_whichCage = uicontrol('Style','text','String','Cage: ',...
     'Units', 'normalized',        'Tag', 'text_whichcage',...
     'Position',[0.01,0.863,0.02,0.02]);
 handles.hpopup_Cage = uicontrol('Style','popupmenu',...
-    'String',[{'Choose a Cage'} ; 1:handles.total_cage_num],...
+    'String',[{'Choose a Cage'} ; (1:handles.total_cage_num)+ handles.init_cage],...
     'Units', 'normalized',        'Tag', 'popup_whichcage',...
     'Position',[0.03,0.868,0.04,0.02],...
     'Callback',{@button_moveSet,'Read'},...
@@ -378,11 +381,13 @@ start(handles.serial_update_timer);
     function edit_mice_Callback(source,~)
         % Create a folder for the mice under the dirctory of that Cage
         Cage = get(source,'Tag');
+        Cage_num = str2double(Cage);
+        Cage_label = num2str(Cage_num + handles.init_cage);
         Mice = get(source,'String');
-        if ~exist(['./Data/Cage',Cage,'/',Mice], 'dir')
-            mkdir(['./Data/Cage',Cage,'/',Mice]);
+        if ~exist(['./Data/Cage',Cage_label,'/',Mice], 'dir')
+            mkdir(['./Data/Cage',Cage_label,'/',Mice]);
         end
-        handles.db_table{str2double(Cage)}.Mouse = Mice;
+        handles.db_table{Cage_num}.Mouse = Mice;
     end
 
 % Popup Menu: left click to chose a port
@@ -410,6 +415,7 @@ start(handles.serial_update_timer);
         % handles = guidata(source);
         Cage = get(source,'Tag');
         Cage_num = str2double(Cage);
+        Cage_label = num2str(Cage_num + handles.init_cage);
         if strcmp(get(source,'String'), 'Open')
             % open com port
             str_com = handles.db_table{Cage_num}.COM;
@@ -438,17 +444,17 @@ start(handles.serial_update_timer);
                     
                     Mice = get(handles.hedit_mice(Cage_num),'String');
                     
-                    if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 2
-                        eval(['delete ','./Data/Cage',Cage,'/',Mice,'/allmat.mat']);
+                    if exist(['./Data/Cage',Cage_label,'/',Mice,'/allmat.mat'], 'file') == 2
+                        eval(['delete ','./Data/Cage',Cage_label,'/',Mice,'/allmat.mat']);
                     end
-                    if exist(['./Data/Cage',Cage,'/',Mice,'/msg.txt'], 'file') == 2
-                        eval(['delete ','./Data/Cage',Cage,'/',Mice,'/msg.txt']);
+                    if exist(['./Data/Cage',Cage_label,'/',Mice,'/msg.txt'], 'file') == 2
+                        eval(['delete ','./Data/Cage',Cage_label,'/',Mice,'/msg.txt']);
                     end
                     
-                    handles.fileID(Cage_num) = fopen(['./Data/Cage',Cage,'/',Mice,'/msg.txt'],'a');
+                    handles.fileID(Cage_num) = fopen(['./Data/Cage',Cage_label,'/',Mice,'/msg.txt'],'a');
                     
                     % trial-time and weight mat file to record
-                    handles.matObj{Cage_num} = matfile(['Data/Cage',Cage,'/',Mice,'/allmat.mat'],'Writable',true);
+                    handles.matObj{Cage_num} = matfile(['Data/Cage',Cage_label,'/',Mice,'/allmat.mat'],'Writable',true);
                     handles.matObj{Cage_num}.weight = zeros(1,41);% 1st col: datetime; 2:161 col: weight data in float (4 bytes/data)
                                      
                     handles.localdata{Cage_num}.startDate = handles.db_table{Cage_num}.startDate; 
@@ -480,11 +486,11 @@ start(handles.serial_update_timer);
                 fclose(handles.fileID(Cage_num));
                 delete(handles.s{Cage_num});
                 Mice = get(handles.hedit_mice(Cage_num),'String');
-                if exist(['./Data/Cage',Cage,'/',Mice,'/allmat.mat'], 'file') == 2
-                    eval(['delete ','./Data/Cage',Cage,'/',Mice,'/allmat.mat']);
+                if exist(['./Data/Cage',Cage_label,'/',Mice,'/allmat.mat'], 'file') == 2
+                    eval(['delete ','./Data/Cage',Cage_label,'/',Mice,'/allmat.mat']);
                 end
-                if exist(['./Data/Cage',Cage,'/',Mice,'/msg.txt'], 'file') == 2
-                    eval(['delete ','./Data/Cage',Cage,'/',Mice,'/msg.txt']);
+                if exist(['./Data/Cage',Cage_label,'/',Mice,'/msg.txt'], 'file') == 2
+                    eval(['delete ','./Data/Cage',Cage_label,'/',Mice,'/msg.txt']);
                 end
             catch e
                 disp('Close a Serial Port...');
@@ -515,7 +521,7 @@ start(handles.serial_update_timer);
     function button_plotPW_Callback(source,~)
         Cage_num = str2double(get(source,'Tag'));
         if strcmp(get(handles.hbutton_open(Cage_num),'String'), 'Open')
-            msgbox(['The COM port of Cage ', num2str(Cage_num), ' is CLOSED!']);
+            msgbox(['The COM port of Cage ', num2str(Cage_num + handles.init_cage), ' is CLOSED!']);
             return;
         else
             selection = questdlg('Do you want to pull data from SD card (need some time) or plot data stored in Matlab?',...
@@ -580,7 +586,7 @@ start(handles.serial_update_timer);
                         end
                         title(['Avg. ', num2str(weight_24), ' g in last 24-hr']);
                         xlim([current_time-1 current_time]);
-                        ylabel('weight (g)'); xlabel('Time (hour)'); ylim([12 30]);
+                        ylabel('weight (g)'); xlabel('Time (hour)'); ylim([12 35]);
                         set(gca,'xtick',[current_time-1 current_time-22/24 current_time-20/24 current_time-18/24 current_time-16/24 ...
                             current_time-14/24 current_time-12/24 current_time-10/24 current_time-8/24 current_time-6/24 ...
                             current_time-4/24 current_time-2/24 current_time],...
@@ -595,13 +601,15 @@ start(handles.serial_update_timer);
 
 % Open Message txt file
     function button_msg_Callback(source,~)
-        Cage_num = get(source,'Tag');
-        if strcmp(get(handles.hbutton_open(str2double(Cage_num)),'String'), 'Open')
-            msgbox(['The COM port of Cage ', Cage_num, ' is CLOSED!']);
+        Cage = get(source,'Tag');
+        Cage_num=str2double(Cage);
+        Cage_label = num2str(Cage_num + handles.init_cage);
+        if strcmp(get(handles.hbutton_open(Cage_num),'String'), 'Open')
+            msgbox(['The COM port of Cage ', Cage_label, ' is CLOSED!']);
             return;
         else
-            Mice = get(handles.hedit_mice(str2double(Cage_num)),'String');
-            eval(['!notepad ','./Data/Cage',Cage_num,'/',Mice,'/msg.txt &']); % return immediately with '&'
+            Mice = get(handles.hedit_mice(Cage_num),'String');
+            eval(['!notepad ','./Data/Cage',Cage_label,'/',Mice,'/msg.txt &']); % return immediately with '&'
         end
     end
 
@@ -613,10 +621,10 @@ start(handles.serial_update_timer);
             msgbox('Please choose a cage to control');
             return;
         else
-            Cage_num = str2double(str{value});
+            Cage_num = str2double(str{value})-handles.init_cage;
         end
         if strcmp(get(handles.hbutton_open(Cage_num),'String'), 'Open')
-            msgbox(['The COM port of Cage ', num2str(Cage_num), ' is CLOSED!']);
+            msgbox(['The COM port of Cage ', str{value}, ' is CLOSED!']);
             return;
         end
         switch arg
@@ -714,8 +722,9 @@ start(handles.serial_update_timer);
                 
                 set(handles.hedit_mice(i), 'String', file_loaded.para(i).mouse_name);
                 handles.db_table{i}.Mouse = file_loaded.para(i).mouse_name;
-                if ~exist(['./Data/Cage',int2str(i),'/',file_loaded.para(i).mouse_name], 'dir')
-                    mkdir(['./Data/Cage',int2str(i),'/',file_loaded.para(i).mouse_name]);
+                i_label=int2str(i+handles.init_cage);
+                if ~exist(['./Data/Cage',i_label,'/',file_loaded.para(i).mouse_name], 'dir')
+                    mkdir(['./Data/Cage',i_label,'/',file_loaded.para(i).mouse_name]);
                 end
                 
                 if ~isnan(file_loaded.para(i).startDate)
@@ -863,7 +872,7 @@ function button_deleteSelwarn_Callback(~, ~)
                 end
                 
             case 'W' % weight 
-                %if ((size(A,2))>=163)
+                if ((size(A,2))>=163)
                 try
                     indT=handles.localdata{i_cage}.ind;
                     handles.localdata{i_cage}.weight(indT,1)=now;
@@ -884,13 +893,13 @@ function button_deleteSelwarn_Callback(~, ~)
                     %disp(e);
                 end
 %                  disp('Weight-end');
-                %end
+                end
 
             case 'E' % error msg
                 try
                     existingItems = get(handles.hlistbox, 'String');    % get current listbox list
                     n_items = length(existingItems);
-                    existingItems{n_items+1} = ['Cage ',num2str(i_cage),': ',A(4:end),' (',datestr(now),')'];
+                    existingItems{n_items+1} = ['Cage ',num2str(i_cage+handles.init_cage),': ',A(4:end),' (',datestr(now),')'];
                     set(handles.hlistbox, 'String', existingItems);
                     set(handles.hlistbox, 'Value', n_items+1);
                     fprintf(handles.fileID(i_cage),[A(4:end) '\n']);
@@ -931,7 +940,8 @@ function button_deleteSelwarn_Callback(~, ~)
                     % plot data in handles.trial_24: col1: timestamp; col2:trial_type; col3: trial_outcome
                     time_now = str2double(A(2:end));
                     if isempty (handles.trial_24)
-                        figure, subplot(2,1,1), title('No trials in last 24 hrs');
+                        %figure, subplot(2,1,1), title('Nooo trials in last 24 hrs');
+                         disp(['empty dataArray in caseN---Cage' num2str(i_cage+handles.init_cage)]);
                     else
                         timestamp = handles.trial_24(:,1);
                         trial_type = handles.trial_24(:,2);
@@ -960,7 +970,7 @@ function button_deleteSelwarn_Callback(~, ~)
                 try
                     existingItems = get(handles.hwarnbox, 'String');    % get current listbox list
                     n_items = length(existingItems);
-                    existingItems{n_items+1} = ['Cage ',num2str(i_cage),': ',A(4:end),' (',datestr(now),'Q)'];
+                    existingItems{n_items+1} = ['Cage ',num2str(i_cage+handles.init_cage),': ',A(4:end),' (',datestr(now),'Q)'];
                     set(handles.hwarnbox, 'String', existingItems);
                     set(handles.hwarnbox, 'Value', n_items+1);
                     fprintf(handles.fileID(i_cage),[A(4:end) '\n']);
@@ -971,7 +981,8 @@ function button_deleteSelwarn_Callback(~, ~)
                 end
                 clear existingItems;
                               
-            otherwise
+             %otherwise
+             case 'M'
                 try
                     fprintf(handles.fileID(i_cage),[A(4:end) '\n']);
                 catch e
@@ -992,15 +1003,17 @@ function button_deleteSelwarn_Callback(~, ~)
                 %disp(['serialTimer' num2str(i_cage) all_serialPorts]);
                 try
                     getpinstatus(handles.s{i_cage});
-                catch e                  
+                catch e                    
                     fclose(handles.fileID(i_cage));
                     delete(handles.s{i_cage});
                     Mice = get(handles.hedit_mice(i_cage),'String');
-                    if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat'], 'file') == 2
-                        eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat']);
+                    
+                    i_cage_label=num2str(i_cage+handles.init_cage);
+                    if exist(['./Data/Cage',i_cage_label,'/',Mice,'/allmat.mat'], 'file') == 2
+                        eval(['delete ','./Data/Cage',i_cage_label,'/',Mice,'/allmat.mat']);
                     end
-                    if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt'], 'file') == 2
-                        eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt']);
+                    if exist(['./Data/Cage',i_cage_label,'/',Mice,'/msg.txt'], 'file') == 2
+                        eval(['delete ','./Data/Cage',i_cage_label,'/',Mice,'/msg.txt']);
                     end
                     
                     set(handles.hbutton_open(i_cage),'String','Open');
@@ -1089,11 +1102,13 @@ function button_deleteSelwarn_Callback(~, ~)
                                 fclose(handles.fileID(i_cage)); % close file object
                                 delete(handles.s{i_cage});  % close serial port
                                 Mice = get(handles.hedit_mice(i_cage),'String');
-                                if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat'], 'file') == 2
-                                    eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/allmat.mat']);
+                                
+                                i_cage_label=num2str(i_cage+handles.init_cage);
+                                if exist(['./Data/Cage',i_cage_label,'/',Mice,'/allmat.mat'], 'file') == 2
+                                    eval(['delete ','./Data/Cage',i_cage_label,'/',Mice,'/allmat.mat']);
                                 end
-                                if exist(['./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt'], 'file') == 2
-                                    eval(['delete ','./Data/Cage',num2str(i_cage),'/',Mice,'/msg.txt']);
+                                if exist(['./Data/Cage',i_cage_label,'/',Mice,'/msg.txt'], 'file') == 2
+                                    eval(['delete ','./Data/Cage',i_cage_label,'/',Mice,'/msg.txt']);
                                 end
                             catch e
                                 disp(e);

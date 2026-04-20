@@ -1,0 +1,11 @@
+trig_counter = 3066
+fixation_duration = 60000
+last_advance_headfixation_counter = 2491
+Fixation_Outcome = 9; 12; 12; 9; 9; 9; 9; 9; 9; 12; 9; 9; 9; 12; 9; 12; 9; 9; 9; 12; 
+struggle_thres_neg = -12
+struggle_thres_pos = 42
+last_advance_threshold_counter = 3084
+headfixation_counter = 3133
+fixation_interval_max = 60000
+weight_offset = 0
+calibration_factor = 1

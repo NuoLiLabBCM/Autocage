@@ -1,31 +1,24 @@
-/*
-  Modified from Reverse Contingency Task v1.0
-
-  Training will stay in protocol 4 (sample) and reverse contingency once perf > 80%
-
-  ParaS file need to append contingency (byte) and contingency_trial (unsigned int)
-  trial.txt file include contingency and contingency_trial
-
-*/
+//combine Master,task and wave board. JL 11/19/2024
 
 #include <string.h>
 #include <SD.h>        // SD card
 #include <DueTimer.h>  // Timer interrupt
 #include "RTClib.h"    // real time clock
 #include "HX711.h"     // weighting amplifier libirary
-//#include <math.h>
+
+#include "pwm_lib.h" // pwm lib for mask flashing   JL 11/19/2024
+#include <Wire.h>
+#include <Adafruit_MCP4725.h>
+
+#include <SPI.h>
 
 /* Connection Circuit:
   Controller.SerialUSB <<======>> PC (data and/or debug info)
-  Controller.Serial1   <<======>> Bpod.Serial1 (protocol and events data)
-                                 || (trigger laser and maskLED)
-                                 vv
-  Controller.Serial2   <<======>> waveSurfer.Serial2 (powerWeight: 0-100%)
 */
 
-/*********************************************************************************************************/
-/***************************************** Head-Fixation related *****************************************/
-/*********************************************************************************************************/
+//*********************************************************************************************************/
+//***************************************** Head-Fixation related *****************************************/
+//*********************************************************************************************************/
 
 ////////////// define finite states for head-fixation //////////////
 #define CHECK_TRIG          1
@@ -50,7 +43,7 @@ unsigned long last_weight_read_time;
 #define P_DELAY      22 // Delay Protocol:    delay period 0.3 -> 1.3 sec
 #define P_OPTOSTIM   23 // Optostim Protocol: start optogenetics (during sample or delay, 20% each)
 
-bool protocol_sent = 0;
+bool protocol_sent_run = 0;
 
 // port definition
 const byte portMotorLR     = 2;  // analog write channel, Left-Right
@@ -64,6 +57,75 @@ const byte portWeight_CLK  = 6;  // weight stage clock
 const byte switchPin       = 49; // ToggerSwitch pin to start/pause experiment
 const byte ledPin          = 13; // LED pin
 const byte chipSelect      = 10; // Adafruit SD shields and modules: pin 10
+
+
+using namespace arduino_due::pwm_lib;
+// for go cue sound
+#define PWM_PERIOD_PIN_53 27000  //3.7khz    
+#define PWM_DUTY_PIN_53   13500  // 50% duty   
+// for masking led             
+#define PWM_PERIOD_PIN_44 10000000 // 100 ms, 10 Hz      
+#define PWM_DUTY_PIN_44   100000  //  1% 
+             
+pwm<pwm_pin::PWMH2_PB14> pwm_pin53;
+pwm<pwm_pin::PWMH5_PC19> pwm_pin44;
+
+Adafruit_MCP4725 dac;
+volatile uint16_t sample_ind = 0;
+const uint16_t thorlab_flat_sine[50]  = {4079, 4031, 3951, 3842, 3704, 3540, 3353, 3145, 2919, 2680,
+                                         2431, 2176, 1919, 1664, 1415, 1176, 950, 742, 555, 391, 253,
+                                         144, 64, 16, 0, 16, 64, 144, 253, 391, 555, 742, 950, 1176,
+                                         1415, 1664, 1919, 2176, 2431, 2680, 2919, 3145, 3353, 3540,
+                                         3704, 3842, 3951, 4031, 4079, 4095
+                                        };
+
+const uint16_t thorlab_ramp_sine[200] = {4058, 3990, 3892, 3765, 3611, 3434, 3235, 3019, 2788, 2546,
+                                         2297, 2045, 1794, 1547, 1309, 1082, 870, 676, 502, 352, 227,
+                                         128, 57, 14, 0, 14, 56, 124, 217, 332, 469, 624, 794, 976,
+                                         1167, 1364, 1564, 1763, 1957, 2144, 2321, 2484, 2632, 2761,
+                                         2871, 2958, 3023, 3063, 3080, 3071, 3039, 2983, 2904, 2804,
+                                         2685, 2549, 2397, 2233, 2058, 1876, 1690, 1501, 1314, 1131,
+                                         955, 788, 632, 490, 363, 254, 163, 92, 41, 10, 0, 10, 40, 88,
+                                         153, 235, 330, 438, 556, 682, 814, 948, 1084, 1219, 1349, 1474,
+                                         1591, 1698, 1794, 1876, 1945, 1998, 2035, 2056, 2060, 2048,
+                                         2019, 1975, 1916, 1844, 1759, 1664, 1559, 1447, 1328, 1206,
+                                         1082, 957, 835, 715, 601, 494, 394, 304, 225, 156, 100, 56,
+                                         25, 6, 0, 6, 23, 52, 90, 137, 191, 252, 318, 388, 460, 532,
+                                         604, 675, 742, 804, 861, 912, 955, 991, 1019, 1037, 1047,
+                                         1048, 1040, 1024, 999, 967, 929, 884, 833, 779, 721, 660,
+                                         598, 536, 474, 413, 355, 299, 248, 200, 157, 119, 86, 59, 37,
+                                         20, 9, 2, 0, 2, 7, 16, 27, 39, 53, 67, 81, 94, 106, 116, 125,
+                                         131, 134, 134, 131, 126, 117, 106, 93, 77, 59, 40, 20, 0
+                                        };
+
+const uint16_t ultra_flat_sine[50]  = {4081, 4041, 3974, 3882, 3767, 3629, 3471, 3297, 3107, 2907,
+                                       2697, 2483, 2267, 2053, 1844, 1643, 1454, 1279, 1121, 984, 868, 776,
+                                       709, 669, 655, 669, 709, 776, 868, 984, 1121, 1279, 1454, 1643, 1844,
+                                       2053, 2267, 2483, 2697, 2907, 3107, 3297, 3471, 3629, 3767, 3882,
+                                       3974, 4041, 4081, 4095
+                                      };
+
+const uint16_t ultra_ramp_sine[200] = {4064, 4007, 3924, 3818, 3689, 3540, 3373, 3191, 2997, 2794,
+                                       2585, 2373, 2162, 1955, 1754, 1564, 1386, 1223, 1077, 951, 846,
+                                       763, 703, 667, 655, 667, 702, 759, 837, 934, 1049, 1179, 1322,
+                                       1475, 1636, 1801, 1969, 2136, 2299, 2456, 2605, 2742, 2866, 2975,
+                                       3066, 3140, 3194, 3228, 3242, 3235, 3208, 3161, 3095, 3011, 2911,
+                                       2796, 2669, 2531, 2384, 2231, 2075, 1916, 1759, 1606, 1457, 1317,
+                                       1186, 1067, 961, 869, 792, 732, 690, 664, 655, 664, 688, 729, 784,
+                                       852, 933, 1023, 1122, 1228, 1339, 1452, 1566, 1679, 1789, 1893,
+                                       1992, 2082, 2162, 2231, 2289, 2333, 2364, 2382, 2385, 2375, 2351,
+                                       2314, 2265, 2204, 2133, 2053, 1965, 1870, 1771, 1668, 1564, 1459,
+                                       1356, 1256, 1160, 1070, 987, 911, 844, 787, 739, 702, 676, 660, 655,
+                                       660, 675, 699, 731, 770, 816, 867, 923, 981, 1041, 1102, 1163, 1222,
+                                       1278, 1331, 1379, 1421, 1458, 1488, 1511, 1527, 1535, 1535, 1529,
+                                       1515, 1495, 1468, 1435, 1397, 1355, 1309, 1261, 1210, 1158, 1105,
+                                       1053, 1002, 953, 907, 863, 823, 787, 755, 727, 704, 686, 672, 662,
+                                       657, 655, 657, 661, 668, 678, 688, 699, 711, 723, 734, 744, 753, 760,
+                                       765, 768, 768, 766, 761, 754, 744, 733, 720, 705, 689, 672, 655
+                                      };
+
+float powerWeight = 1.0;
+byte laserByte = 2; // 1-using thorlab laser; 2-using Ultra laser
 
 typedef struct {
   int trig_counter                      = 0;    // Switch triggered counter
@@ -85,9 +147,6 @@ typedef struct {
   int events_num                = 0;
   unsigned long events_time[20] = {};
   byte events_id[20]            = {};
-  /* not used in this program
-    // 1-LickL; 2-rewardL; 3-LickR; 4-rewardR;  5-motorFBadvance; 6-motorLRadvance
-  */
   // 1-mark arduino restarted
   // 7-switchTriggered; 8-headfixation; 11-headfixation again immediately after release
   // 9-release1:timeup; 10-release2:escape; 12-release3:struggle;
@@ -96,9 +155,9 @@ typedef struct {
   // 15-arduino switch on && SD card inserted;
   // 16-arduino switch off or SD card not inserted;
   // 20-user updating parameters from GUI: portMotorFB;
-  // 21-user updating parameters from GUI: portMotorLR;
-  // 22-user updating parameters from GUI: portMotorFB_final;
-
+  // 21-user updating parameters from GUI: portMotorLR; 
+  // 22-user updating parameters from GUI: portMotorFB_final;   
+  
   int events_value[20]          = {0};
 } Events_fixation;
 
@@ -137,8 +196,8 @@ bool headfixation_again             = 0;
 
 int regulatorVal_step    = 10;  // not used
 int regulatorVal_min     = 150; // start with a small pressure
-int regulatorVal_max     = 210; //255; // max pressure
-int regulatorVal_release = 10;//30;  // slightly release to reduce retract distance and noise
+int regulatorVal_max     = 210;//255; // max pressure
+int regulatorVal_release = 10; //30;  // slightly release to reduce retract distance and noise
 
 int polePos;
 int poleLastPos;
@@ -148,21 +207,18 @@ int failureCont = 0;
 int failureMax = 5;
 int lastFailure = 0;
 
-
-/****************************************************************************************************/
-/************************************* Finite State Matrix related **********************************/
-/****************************************************************************************************/
+//****************************************************************************************************/
+//************************************* Finite State Matrix related **********************************/
+//****************************************************************************************************/
 
 // Event codes list.
-const PROGMEM String EventNames[50] = {
+const PROGMEM String EventNames[40] = {
   "Port1In", "Port1Out", "Port2In", "Port2Out", "Port3In", "Port3Out", "Port4In", "Port4Out", "Port5In", "Port5Out", "Port6In", "Port6Out", "Port7In", "Port7Out", "Port8In", "Port8Out",
   "BNC1High", "BNC1Low", "BNC2High", "BNC2Low",
   "Wire1High", "Wire1Low", "Wire2High", "Wire2Low", "Wire3High", "Wire3Low", "Wire4High", "Wire4Low",
   "SoftCode1", "SoftCode2", "SoftCode3", "SoftCode4", "SoftCode5", "SoftCode6", "SoftCode7", "SoftCode8", "SoftCode9", "SoftCode10",
   "UnUsed",
-  "Tup",
-  "GlobalTimer1_End", "GlobalTimer2_End", "GlobalTimer3_End", "GlobalTimer4_End", "GlobalTimer5_End",
-  "GlobalCounter1_End", "GlobalCounter2_End", "GlobalCounter3_End", "GlobalCounter4_End", "GlobalCounter5_End"
+  "Tup"   
 };
 
 // Output action name list.
@@ -172,15 +228,11 @@ const PROGMEM String OutputActionNames[17] = {
   "PWM1", "PWM2", "PWM3", "PWM4", "PWM5", "PWM6", "PWM7", "PWM8"
 };
 
-// Meta action name list.
-const PROGMEM String MetaActions[4] = {"Placeholder", "Valve", "LED", "LEDState"};
-
 // Scalar for float timer.
-const PROGMEM int TimerScaleFactor = 10000; // Bpod: 0.1 ms resolution
+const PROGMEM int TimerScaleFactor = 1000;  //1s=1000ms   
 
 // Port and wire parameters for Bpod.
 byte PortInputsEnabled[8] = {1, 1, 0, 0, 0, 0, 0, 0};
-byte WireInputsEnabled[4] = {0, 0, 0, 0};
 
 // Define output format.
 typedef struct OutputActions {
@@ -207,29 +259,14 @@ typedef struct States {
 // Define state machine. Adapted from GenerateBlankStateMatrix.m
 typedef struct StateMatrices {
   byte nStates = 0;
-  // byte nStatesInManifest = 0;
-  // String Manifest = {}; // State names in the order they were added by user
   String StateNames[128]                   = {"Placeholder"}; //State names in the order they were added
   byte InputMatrix[128][40]                = {};
   byte OutputMatrix[128][17]               = {};
-  byte GlobalTimerMatrix[128][5]           = {};
-  float GlobalTimers[5]                    = {};
-  byte GlobalTimerSet[5]                   = {0, 0, 0, 0, 0}; //Changed to 1 when the timer is given a duration with SetGlobalTimer
-  byte GlobalCounterMatrix[128][5]         = {};
-  byte GlobalCounterEvents[5]              = {254, 254, 254, 254, 254}; //Default event of 254 is code for "no event attached".
-  unsigned long GlobalCounterThresholds[5] = {0, 0, 0, 0, 0};
-  int GlobalCounterSet[5]                  = {0, 0, 0, 0, 0}; //Changed to 1 when the counter event is identified and given a threshold with SetGlobalCounter
   float StateTimers[128]                   = {};
   byte StatesDefined[128]                  = {};              //Referenced states are set to 0. Defined states are set to 1. Both occur with AddState
-
 } StateMatrix;
 
-/* Bpod output ports FYI.
-  byte PortPWMOutputLines[8] = {53, 8, 7, 6, 5, 4, 3, 2}; // "pwm1": gocue; "pwm2-8": digital
-  byte WireDigitalOutputLines[4] = {43, 41, 39, 37};      // "WireState"
-  byte ValveDigitalOutputLines[2] = {22, 23};             // "ValveState"
-  byte BncOutputLines[2] = {10, 11};                      // "BNCState"
-*/
+
 OutputAction RewardOutput;
 OutputAction LeftWaterOutput  = {"ValveState", 1};
 OutputAction RightWaterOutput = {"ValveState", 2};
@@ -238,16 +275,16 @@ OutputAction CueOutput        = {"PWM1", 255};
 
 OutputAction PoleOutput       = {"BNCState", 1};
 
-OutputAction WaveSurferTrig    = {"PWM8", 255}; // Masking Flash LED trigger: DIO2 in Bpod
-OutputAction OptogeneticTrig   = {"PWM7", 255}; // Optogenetics stim trigger: DIO3 in Bpod
+OutputAction WaveSurferTrig    = {"PWM2", 255}; // Masking Flash LED trigger
+OutputAction OptogeneticTrig   = {"PWM3", 255}; // Optogenetics stim trigger
 
 String LeftLickAction;
 String RightLickAction;
 
 
-/****************************************************************************************************/
-/***************************************** Trial related *****************************************/
-/****************************************************************************************************/
+//****************************************************************************************************/
+//***************************************** Trial related *****************************************/
+//****************************************************************************************************/
 
 #define    RECORD_TRIALS   100          // record recent 100 trials history in controller
 const byte recent_trials = 30;          // Calculate performance for rencent 30 trials
@@ -300,17 +337,15 @@ typedef struct {
   float reward_left  = 0.03;
   float reward_right = 0.03;
   
-  byte anteriorPos  = 30;
-  byte posteriorPos = 100;
+  byte leftPos  = 30;
+  byte rightPos = 100;
   /////////////////////////////////////////////////
 } Parameters_behavior;
 
 Parameters_behavior    S;
 
-//byte anteriorPos  = 30;
-//byte posteriorPos = 100;
-byte halfPos  = (S.anteriorPos + S.posteriorPos) / 2;
-byte finalPos = S.anteriorPos;
+byte halfPos  = 65;
+byte finalPos = 30; //leftPos;
 
 
 int LickPortMove         = 0;
@@ -331,9 +366,8 @@ float StopLickingPeriod   = 1.0; //
 
 
 byte Perf100        = 0;
-bool Timer3_running = 0;
 int paused          = 0;
-byte ledState       = LOW;
+byte ledState       = 0; //LOW;
 bool Receiving_data_from_Bpod  = 0;
 bool sdcard = 0;
 
@@ -351,11 +385,6 @@ uint16_t nTransition;
 byte trial_stim_index = 0; // 0:no_stim; 1:delay_stim; 2:sample_stim; etc.
 byte weightByte = 100;
 
-byte contingency = 0;
-unsigned int contingency_trial = 0;
-
-int reverse_num = 0; // record reverse number
-
 // others
 RTC_PCF8523         rtc;
 DateTime            now;
@@ -368,41 +397,89 @@ unsigned long unix_time_24;
 
 bool isStruck = 0;
 
-int isHandshake = 0;        	//0:handshake failed; 1:handshake success
-int checkHandshake = 0;     	//0:need to do handshake
 unsigned long bpod_time = 0;  	//StateMatrix running startpoint
-float serial1Timeout = 30000;   //after StateMatrix starting, timeout (ms) for serial1 not getting data back from task board. 
 int usbWflag = 0;               //0:message/warning needs to write to USB serial port.
+
+////////Task board related. JL 11/19/2024
+//Hardware mapping:        //
+byte PortDigitalInputLines[8] = {28, 30, 32, 34, 36, 38, 40, 42};   //28,30  is currently used
+byte PortPWMOutputLines[2] = {53, 44}; // pwm1: gocue; pwm2:masking flush
+byte ValveDigitalOutputLines[2] = {26,27};
+byte BncOutputLines[2] = {11, 12};  //11 is currently used
+
+//Initialize system state vars: 
+//byte PortPWMOutputState[8] = {0}; // State of all 8 output lines (As 8-bit PWM value from 0-255 representing duty cycle. PWM cycles at 1KHZ)
+boolean PortInputLineValue[8] = {0}; // Direct reads of digital values of IR beams
+boolean PortInputLineOverride[8] = {0}; // set to 1 if user created a virtual input, to prevent hardware reads until user returns it to low
+boolean PortInputLineLastKnownStatus[8] = {0}; // Last known status of IR beams
+boolean MatrixFinished = false; // Has the system exited the matrix (final state)?
+boolean MeaningfulStateTimer = false; // Does this state's timer get us to another state when it expires?
+int CurrentState = 1; // What state is the state machine currently in? (State 0 is the final state)
+int NewStateIdx = 1;
+int stateNum = 0;
+byte CurrentEvent[10] = {0}; // What event code just happened and needs to be handled. Up to 10 can be acquired per 30us loop.
+byte nCurrentEvents = 0; // Index of current event
+byte InputStateMatrix[128][40] = {0}; // Matrix containing all of Bpod's inputs and corresponding state transitions
+byte OutputStateMatrix[128][17] = {0}; // Matrix containing all of Bpod's output actions for each Input state
+int MaxTimestamps  = 1024; // Maximum number of timestamps (to check when to start event-dropping)
+int MaxTransitions = 1024;
+unsigned long StateTimers[128] = {0}; // Timers for each state
+unsigned long MatrixStartTime = 0; // Trial Start Time
+unsigned long StateStartTime = 0; // Session Start Time
+unsigned long CurrentTime = 0; // Current time (units = timer cycles since start; used to control state transitions)
+unsigned long TimeFromStart = 0;
+//byte RunningStateMatrix = 0; // 1 if state matrix is running
+////End 11/19/2024
 
 //watchdog
 int watchdogTime = 10000;  //10s
 
 void watchdogSetup(void)
 {
-  // do what you want here
+// do what you want here
 }
 
 
-/****************************************************************************************************/
-/********************************************** Setup() *********************************************/
-/****************************************************************************************************/
+//****************************************************************************************************/
+//********************************************** Setup() *********************************************/
+//****************************************************************************************************/
 
 void setup() {
   isStruck = 0;
   isMotorOK = 1;
-  checkHandshake = 0;
   usbWflag=0;
-
+	
   watchdogEnable(watchdogTime);
-
+  
   SerialUSB.begin(115200);   // To PC for debug info and/or Data
 
-  Serial1.begin(115200);     // To Bpod
-  while (Serial1.available()) {
-    Serial1.read(); // clear serial1 dirty data
-  }
+  Timer4.attachInterrupt(timer_updateDAC); //optostim
+  Timer4.setPeriod(500); // every 0.5 ms to update DAC value
 
-  Serial2.begin(115200);     // To waveSurfer
+  // For Adafruit MCP4725A1 the address is 0x62 (default) or 0x63 (ADDR pin tied to VCC)
+  dac.begin(0x62);
+  dac.setVoltage(0, false);
+
+////Task board related JL 11/19/2024
+	for (int x = 0; x < 8; x++) {
+		pinMode(PortDigitalInputLines[x], INPUT_PULLUP);
+	}
+	for(int x = 0; x < 2; x++) {
+		pinMode(PortPWMOutputLines[x], OUTPUT);
+		analogWrite(PortPWMOutputLines[x], 0);
+	}	
+	for (int x = 0; x < 2; x++) {
+		pinMode(BncOutputLines[x], OUTPUT);
+		digitalWrite(BncOutputLines[x], LOW);
+	}
+	for (int x = 0; x < 2; x++) {
+		pinMode(ValveDigitalOutputLines[x],OUTPUT);
+		digitalWrite(ValveDigitalOutputLines[x], LOW);
+	}
+
+	Timer3.attachInterrupt(handler);
+	Timer3.setPeriod(100); // Runs every 100us
+////End 11/19/2024
 
   analogReadResolution(8);   // Max: 12
   analogWriteResolution(8);
@@ -410,18 +487,19 @@ void setup() {
   analogWrite(DAC0, regulatorVal_release);
 
   pinMode(ledPin, OUTPUT);
-  digitalWriteDirect(ledPin, ledState);
+  analogWrite(ledPin, ledState);
+  
   pinMode(switchPin, INPUT_PULLUP); // low if switch on; hight if switch off
 
   pinMode(portSwitchL, INPUT_PULLUP);
-  SwitchL_LastStatus = digitalReadDirect(portSwitchL);
+  SwitchL_LastStatus = digitalRead(portSwitchL);
   pinMode(portSwitchR, INPUT_PULLUP);
-  SwitchR_LastStatus = digitalReadDirect(portSwitchR);
-
+  SwitchR_LastStatus = digitalRead(portSwitchR);
+ 
   pinMode(portMotorLR, OUTPUT);
   pinMode(portMotorFB, OUTPUT);
   pinMode(portMotorPole, OUTPUT);
-
+  
   analogWrite(portMotorLR, 5);
   analogWrite(portMotorFB, 5);
   analogWrite(portMotorPole, 5);
@@ -429,24 +507,20 @@ void setup() {
   pinMode(portSD, INPUT_PULLUP);
 
   // Check if SD Card is working...
-  if (digitalReadDirect(portSD) == 1) {
-    sdcard = 0;
+  if (digitalRead(portSD) == 1) {
+	sdcard = 0;
     SerialUSB.println("E: SD Card not inserted...0");
   } else {
-    sdcard = 1;
+	sdcard = 1;
     SD.begin(chipSelect);
-    read_SD_para_F();   // 4 ms
+	read_SD_para_F();   // 4 ms
     read_SD_para_S();
     SerialUSB.println("M: SD card detected!");
   }
 
-  //read_SD_para_F();   // 4 ms
-  //read_SD_para_S();
-
   // Check if the RT Clock ready
   if (! rtc.begin()) {
     SerialUSB.println("E: Couldn't find RT Clock");
-    //return;
   }
   if (! rtc.initialized()) { // never happen
     SerialUSB.println("M: RTC is NOT running! Adjust Time!");
@@ -457,9 +531,6 @@ void setup() {
     // rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
 
-  // print current time and date // 2 ms
-  // printCurrentTime();
-
   // write an artificial event to mark the restart of Arduino board
   Ev.events_num = 0;
   Ev.events_id[Ev.events_num] = 1; // restart;
@@ -469,15 +540,6 @@ void setup() {
   Ev.events_num = 1;
   write_SD_event_fixation(); // write event to file
   Ev.events_num = 0;
-
-  //  startMicros = micros();
-  //  now = rtc.now();
-  //  Ev.events_time[Ev.events_num] = now.unixtime(); // 950 us
-  //  SerialUSB.println(micros()-startMicros);
-  //
-  //  startMicros = micros();
-  //  Ev.events_time[Ev.events_num] = millis(); // 1us
-  //  SerialUSB.println(micros()-startMicros);
 
   randomSeed(analogRead(0));
 
@@ -494,88 +556,62 @@ void setup() {
 
   // initialize weighting scales
   scale.set_scale();
-  //scale.tare();  //Reset the scale to 0
   scale.set_offset(weight_offset);
   scale.set_scale(calibration_factor);
 
-  // Handshake with Bpod; get stuck and keep trying if failed
-  //handshake_with_bpod();
-
-  Timer4.attachInterrupt(Incase_handler); // in case receiving Bpod data struck
-  Timer4.setPeriod(5000000); // Runs  5 sec later to check if get struck
-
-  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0) {
+  if (digitalRead(switchPin) == 0 && digitalRead(portSD) == 0) {
     paused = 0;
   } else {
     paused = 1;
   }
-
+  
 }
 
 
-/****************************************************************************************************/
-/********************************************** Loop() **********************************************/
-/****************************************************************************************************/
+//****************************************************************************************************/
+//********************************************** Loop() **********************************************/
+//****************************************************************************************************/
 void loop() {
-
-  watchdogReset();
-
-  if (digitalReadDirect(portSD) == 0) {
-    if (sdcard == 0) {
-      sdcard = 1;
-      SD.begin(chipSelect);
-	  read_SD_para_F();
-	  read_SD_para_S();
-    }
-  } else {
-    if (sdcard == 1) {
-      sdcard = 0;
-      if (SerialUSB.dtr() && SerialUSB_connected()) {
-        SerialUSB.println("E: SD Card not inserted...1");
-      }
-    }
-  }
-  
-    if (checkHandshake == 0){
-		checkHandshake = 1;
-		handshake_with_bpod();
-    } 
 	
-	if (SerialUSB.dtr() && SerialUSB_connected() && usbWflag==0) {
-		usbWflag=1;
-		if (isHandshake){
-			SerialUSB.println("E: handshake successful!");
-		}else{
-			SerialUSB.println("Q: handshake failed!");
-		}	
-    }
+	watchdogReset();
+	
+	if (digitalRead(portSD) == 0){
+		if (sdcard ==0){
+			sdcard =1;
+			SD.begin(chipSelect);
+			read_SD_para_F();
+			read_SD_para_S();
+		}
+	}else{
+		if (sdcard ==1){
+			sdcard=0;
+			if (SerialUSB.dtr() && SerialUSB_connected()) {
+				SerialUSB.println("E: SD Card not inserted...1");
+			}
+		}
+	}
 
   // if (Rocker_switch is ON && SD card inserted), run the state matrix
-  if (digitalReadDirect(switchPin) == 0 && digitalReadDirect(portSD) == 0 && isMotorOK==1 && isHandshake==1) {
+  if (digitalRead(switchPin) == 0 && digitalRead(portSD) == 0 && isMotorOK==1){
 
     if (paused == 1) {
       paused = 0;
-
-      Ev.events_id[Ev.events_num] = 15; //switch on
+	  
+	  Ev.events_id[Ev.events_num] = 15; //switch on
       Ev.events_time[Ev.events_num] = millis();
       Ev.events_value[Ev.events_num] = -1;
       Ev.events_num ++;
 
-      ledState = HIGH;
-      digitalWriteDirect(ledPin, ledState);
+      ledState = 255; //HIGH;
+	  analogWrite(ledPin, ledState);
       if (SerialUSB.dtr() && SerialUSB_connected()) {
         SerialUSB.println("M: Program RESUME!!!");
       }
 
-      // clear serial1 buffer
-      while (Serial1.available()) {
-        Serial1.read();
-      }
-
       // in case SD card was removed and re-insert, need re-initilization
-      //SD.begin(chipSelect);
       read_SD_para_F();
       read_SD_para_S();
+	  
       analogWrite(portMotorLR, S.LR_motor_position);
       analogWrite(portMotorFB, S.FB_motor_position);
 
@@ -586,11 +622,11 @@ void loop() {
 	  
 	  scale.set_offset(weight_offset);
 	  scale.set_scale(calibration_factor);
-
-      timer_state = CHECK_TRIG;
+	  
+	  timer_state = CHECK_TRIG;
     }
 
-    if (protocol_sent == 0) {
+    if (protocol_sent_run == 0) {	
       if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > S.FB_final_position) {
         send_protocol_to_Bpod_and_Run(); //49 ms - 96 ms
       } else if (headfixation_flag == 1) { // need check if head is fixed
@@ -598,45 +634,39 @@ void loop() {
       }
     }
 
-    if (Serial1.available()) { // receiving data from Bpod (i.e., a trial is done)
-      // Read data from Bpod, Write events to SD card, Update trial outcome
-      Read_Data_from_Bpod(); // 5-100 ms (30% writ to SD card) depending how many data
+	if (MatrixFinished == true) {//a trial is done, Write events to SD card, Update trial outcome
+	    MatrixFinished = false;
+	    valve_control(0); // Reset valves
+		stopMaskingflash();
+		stopGocue();	
+		digitalWrite(BncOutputLines[0], LOW); // Reset BNC outputs
+		ledState = 0;
+		analogWrite(ledPin, ledState); //OFF
+		
+        write_SD_eventST_updateOutcome(); 
 
-      S.currentTrialNum++;
+		S.currentTrialNum++;
 
-      UpdatePerformance(); // < 1 ms
+		UpdatePerformance(); // < 1 ms
 
-      PrintResult2PC();
+		PrintResult2PC();
 
-      // send_pars_S_to_PC();   // Send parameters S of this trial to PC; 1 ms
-      write_SD_trial_info(); // log trial info to SD; 1 ms
+		write_SD_trial_info(); // log trial info to SD; 1 ms
 
-      ////////////
-      if (S.Trial_Outcome == 1) {
-        last_reward_time = millis();  // record the last reward time
-        timed_drop_count = 0;
-      }
-      ////////////
-
-      //////////// for next trial ///////////
-      autoChangeProtocol();    // Change protocol and parameters based on performance; < 1 ms
-      autoAdjustLickportPosition(); // Adjust lickpost position if bias develops
-      autoReward();            // Set Reward Flag if many wrongs in a row; < 1 ms
-      trialSelection();        // determine S.TrialType; < 1 ms
-      write_SD_para_S();       // write parameter S (updated after this trial) to SD card; 1 ms
-      protocol_sent = 0;       // enable next trial
-      //      if (F.fixation_duration > 10000) {
-      //        delay(1000);             // additional inter-trial interval
-      //      }
-      //////////// for next trial ///////////
-    }else {
-		if (millis()-bpod_time > serial1Timeout && protocol_sent == 1){
-			 checkHandshake = 0;
-			 protocol_sent = 0;
-			 if (SerialUSB.dtr() && SerialUSB_connected()) {
-				SerialUSB.println("M: need to check handshake");
-			 }
+		if (S.Trial_Outcome == 1) {
+			last_reward_time = millis();  // record the last reward time
+			timed_drop_count = 0;
 		}
+    
+
+      //////////// for next trial ///////////
+		autoChangeProtocol();    // Change protocol and parameters based on performance; < 1 ms
+		autoAdjustLickportPosition(); // Adjust lickpost position if bias develops
+		autoReward();            // Set Reward Flag if many wrongs in a row; < 1 ms
+		trialSelection();        // determine S.TrialType; < 1 ms
+		write_SD_para_S();       // write parameter S (updated after this trial) to SD card; 1 ms
+		protocol_sent_run = 0;       // enable next trial
+      //////////// for next trial ///////////
 	}
 
     if (millis() - last_reward_time > 3 * 3600000) { // there is no reward in last 3 hours
@@ -681,7 +711,7 @@ void loop() {
       weight_tmp = scale.get_units(); // 165 us
       last_weight_read_time = millis();
       if (weight_tmp > 10 && weight_tmp < 40 && headfixation_flag == 0) { // avoid record many zeros
-        weighting_info[weight_counter] = weight_tmp;
+		weighting_info[weight_counter] = weight_tmp;
         weight_counter++;
       }
       if (weight_counter >= 40) { // have 2-sec data in the array
@@ -716,23 +746,23 @@ void loop() {
     }
 
 
-    SwitchL_CurrentStatus   = digitalReadDirect(portSwitchL);
-    SwitchR_CurrentStatus   = digitalReadDirect(portSwitchR);
-
+    SwitchL_CurrentStatus   = digitalRead(portSwitchL);
+    SwitchR_CurrentStatus   = digitalRead(portSwitchR);
+	
     // State Machine for the Head-fixation
     switch_fixation_state();
 
     SwitchL_LastStatus = SwitchL_CurrentStatus;
     SwitchR_LastStatus = SwitchR_CurrentStatus;
-
+	
     // detection of release event => free water to lure next fixation
     if (headfixation_flag == 0 && last_headfixation_flag == 1 && F.fixation_duration < 15000) {
       // free reward to fill the lickport tube
       valve_control(3); //  open valve 1 and 2
       delay(40);
       valve_control(0); // close valve 1 and 2
-
-      Ev.events_id[Ev.events_num] = 14; //  free reward to lure next fixation
+	  
+	  Ev.events_id[Ev.events_num] = 14; //  free reward to lure next fixation
       Ev.events_time[Ev.events_num] = millis();
       Ev.events_value[Ev.events_num] = 40;
       Ev.events_num ++;
@@ -750,10 +780,15 @@ void loop() {
       Ev.events_num = 0;
     }
 
-  }  else  { // if the toggle switch is off
+  } else  { // if the toggle switch is off
     if (paused == 0) {
-      paused = 1; // execute only one time
-      Timer4.stop();
+		paused = 1; // execute only one time
+		
+		valve_control(0); // Reset valves
+		stopMaskingflash();
+		stopGocue();	
+		digitalWrite(BncOutputLines[0], LOW);
+		
       // stop head-fixation
       if (headfixation_flag == 1) { // release head-fixation
         analogWrite(DAC0, regulatorVal_release);
@@ -762,42 +797,37 @@ void loop() {
         Ev.events_time[Ev.events_num] = millis();
         Ev.events_value[Ev.events_num] = millis() - last_state_time;
         Ev.events_num ++;
-        if (sdcard == 1) {
-          write_SD_event_fixation();
-        }
+		if (sdcard ==1){
+			write_SD_event_fixation();
+		}
         Ev.events_num = 0;
         timer_state = CHECK_TRIG;
       }
-
-      Ev.events_id[Ev.events_num] = 16; //switch off
+	  
+	  Ev.events_id[Ev.events_num] = 16; //switch off
       Ev.events_time[Ev.events_num] = millis();
       Ev.events_value[Ev.events_num] = -1;
       Ev.events_num ++;
-
+	  	  
       // stop the trial
-      if (protocol_sent == 1) {
-        protocol_sent = 0;
-        Serial1.write('X'); // stop Bpod
-        delay(200);
-        while (Serial1.available()) {
-          Serial1.read(); // clear imput buffer
-        }
+      if (protocol_sent_run == 1) {
+        protocol_sent_run = 0;
+		ledState = 0; 
+		analogWrite(ledPin, ledState); //OFF
+		Timer3.stop();      // stop timer
       }
-      // retract pole (not necessary with new Bpod firmware)
-      Serial1.write('O');
-      Serial1.write('B');
-      Serial1.write(byte(0));
+	  
       if (SerialUSB.dtr() && SerialUSB_connected()) {
         SerialUSB.println("M: Program PAUSED!!!");
       }
       printCurrentTime(); // print current time and date
     }
-    if (ledState == LOW) {
-      ledState = HIGH;
+    if (ledState == 0) {
+      ledState = 255; //ON
     } else {
-      ledState = LOW;
+      ledState = 0; //OFF;
     }
-    digitalWriteDirect(ledPin, ledState);
+	analogWrite(ledPin, ledState);
     delay(500);
   }
 
@@ -822,7 +852,6 @@ void loop() {
         }
         write_SD_para_S();
         analogWrite(portMotorFB, dataByte);
-        // delay(500);
         // user change event
         Ev.events_id[Ev.events_num] = 20; // user change event: portMotorFB
         Ev.events_time[Ev.events_num] = millis();
@@ -834,7 +863,6 @@ void loop() {
         S.LR_motor_position = dataByte;
         write_SD_para_S();
         analogWrite(portMotorLR, dataByte);
-        // delay(500);
         // user change event
         Ev.events_id[Ev.events_num] = 21; // user change event: portMotorLR
         Ev.events_time[Ev.events_num] = millis();
@@ -903,17 +931,17 @@ void loop() {
         SerialUSB.print(F.struggle_thres_neg);
         SerialUSB.print(";");
         SerialUSB.print(F.struggle_thres_pos);
-		SerialUSB.print(";");
-		SerialUSB.print(S.anteriorPos);
         SerialUSB.print(";");
-        SerialUSB.print(S.posteriorPos);
+		SerialUSB.print(S.leftPos);
+        SerialUSB.print(";");
+        SerialUSB.print(S.rightPos);
         SerialUSB.println(";");
         break;
       case 'T': //tare the scale to 0
         scale.set_scale();
         scale.tare();  //Reset the scale to 0
-        weight_offset = scale.get_offset();
-        write_SD_para_F();
+		weight_offset = scale.get_offset();
+		write_SD_para_F();
         break;
 	  case 'G': //get the scale calibration_factor
 		buffer_tmp = SerialUSB.readStringUntil('\n');
@@ -922,7 +950,7 @@ void loop() {
         scale.set_scale(calibration_factor);
 		write_SD_para_F();
         break;
-      case 'S': //set Struggle threshold
+      case 'S': //set Struggle threshold			
         buffer_tmp = SerialUSB.readStringUntil('\n');
         F.struggle_thres_neg = buffer_tmp.toInt();
         buffer_tmp = SerialUSB.readStringUntil('\n');
@@ -931,10 +959,9 @@ void loop() {
         break;
 	  case 'E': //set Pole left/right position
         buffer_tmp = SerialUSB.readStringUntil('\n');
-        S.anteriorPos = buffer_tmp.toInt();
+        S.leftPos = buffer_tmp.toInt();
         buffer_tmp = SerialUSB.readStringUntil('\n');
-        S.posteriorPos = buffer_tmp.toInt();
-		//halfPos = (S.anteriorPos + S.posteriorPos)/2;
+        S.rightPos = buffer_tmp.toInt();
         write_SD_para_S();
         break;
       case 'A': //
@@ -953,26 +980,16 @@ void loop() {
 
 
 
-/****************************************************************************************************/
-/********************************************** Functions *******************************************/
-/****************************************************************************************************/
+//****************************************************************************************************/
+//********************************************** Functions *******************************************/
+//****************************************************************************************************/
 
 int send_protocol_to_Bpod_and_Run() {
   StateMatrix sma;                  // predefine the state matrix (sent later to Bpod)
-  serial1Timeout = 30000;
   
   switch (S.ProtocolType) {
     // PROTOCOL 1: teaching animal to headfixation, which are universal to all behaviour tasks
     case P_FIXATION: { // Lick and Rectract until Switch Triggered, then increasing headfixation duration gradually
-         serial1Timeout =3630000; 
-        //        // random pole out 100%
-        //        if (random(100) < 0) {
-        //          PoleOutput_left  = {"BNCState", 0};
-        //          PoleOutput_right = {"BNCState", 0};
-        //        } else {
-        //          PoleOutput_left  = {"BNCState", 1};
-        //          PoleOutput_right = {"BNCState", 2};
-        //        }
 
         // Determine trial-specific state matrix fields
         switch (S.TrialType) {
@@ -1016,7 +1033,7 @@ int send_protocol_to_Bpod_and_Run() {
         states[2]  = CreateState("DelayPeriod",       S.DelayPeriod,            1, DelayPeriod_Cond,     0, NoOutput);
         states[3]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     1, ResponseCue_Output);
         states[4]  = CreateState("AnswerPeriod",      3600,                     3, AnswerPeriod_Cond,    0, NoOutput);
-        states[5]  = CreateState("RewardL",           S.reward_left,            1, RewardL_Cond,         1, RewardL_Output);
+		states[5]  = CreateState("RewardL",           S.reward_left,            1, RewardL_Cond,         1, RewardL_Output);
         states[6]  = CreateState("RewardR",           S.reward_right,           1, RewardR_Cond,         1, RewardR_Output);
         states[7]  = CreateState("RewardConsumption", ConsumptionPeriod,        1, Tup_EndTrial_Cond,    0, NoOutput); //0.75
         states[8]  = CreateState("NoResponse",        0.002,                    1, Tup_EndTrial_Cond,    0, NoOutput);
@@ -1035,13 +1052,6 @@ int send_protocol_to_Bpod_and_Run() {
       break;
 
     case P_SAMPLE: { // behavioral protocol 1
-        //        if (S.ProtocolHistoryIndex == 1) { // no pole out
-        //          PoleOutput_left  = {"BNCState", 0};
-        //          PoleOutput_right = {"BNCState", 0};
-        //        } else {
-        //          PoleOutput_left  = {"BNCState", 1};
-        //          PoleOutput_right = {"BNCState", 2};
-        //        }
         switch (S.TrialType) {
           case 1: // left
             LeftLickAction  = "Reward";
@@ -1226,18 +1236,6 @@ int send_protocol_to_Bpod_and_Run() {
 
         MovePole(S.TrialType); // 2 sec
 
-        /* //no auto reward during optostim
-            //otherwise the response optostim will be problematic!
-          // Determine if give free water reward
-          String ActionAfterCue;
-          if (S.TrialType == 0 && S.GaveFreeReward.flag_R_water == 1) {
-          ActionAfterCue = "GiveRightDrop";
-          } else if (S.TrialType == 1 && S.GaveFreeReward.flag_L_water == 1) {
-          ActionAfterCue = "GiveLeftDrop";
-          } else {
-          ActionAfterCue = "AnswerPeriod";
-          }
-        */
         String ActionAfterCue;
         ActionAfterCue = "AnswerPeriod";
 
@@ -1269,24 +1267,21 @@ int send_protocol_to_Bpod_and_Run() {
         State states[16] = {};
         states[0]  = CreateState("TrigTrialStart",    0.1,                      1, TrigTrialStart_Cond,  1, TrigTrialStart_Output);
 
-        if (reverse_num > 2 && random(100) < 21) {  // 20% trials to stim
-
+		powerWeight = 0;        
+		laserByte = 2; // 1-Thorlab; 2-UltraLaser		
+        if (random(100) < 15) {  //15    10% trials to stim
           int randomNum = random(300);
-          if (randomNum < 150) {
-            weightByte = 10;  // percent power level: 10%
-          } else if (randomNum < 300) {
-            weightByte = 50; // percent power level: 50%
+          if (randomNum < 100) {
+            weightByte = 10;  // percent
+          } else if (randomNum < 200) {
+            weightByte = 50; // percent
           } else {
-            weightByte = 100; // percent power level: 100%
+            weightByte = 100; // percent
           }
+		  powerWeight = (float)weightByte / 100;
 
-          byte laserByte = 2; // 1-Thorlab; 2-UltraLaser
-
-          Serial2.write(weightByte);
-          Serial2.write(laserByte);
-
-          randomNum = random(300); // only sample and response stim
-          if (randomNum < 150) { // 1/3 sample
+          randomNum = random(300);   ;
+          if (randomNum < 100) { // 1/3 sample
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    2, Sample_Pole_Stim_Output);
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 2, Sample_Pole_Stim_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
@@ -1297,7 +1292,7 @@ int send_protocol_to_Bpod_and_Run() {
             states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    0, NoOutput);
             // mark this trial as stim trial...sample
             trial_stim_index = weightByte + 1; // 11, 31, 51, 71, 101
-          } else if (randomNum < 150) {// 1/3 delay
+          } else if (randomNum < 200) {// 1/3 delay
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     1, OptoStim_Output);
@@ -1321,9 +1316,7 @@ int send_protocol_to_Bpod_and_Run() {
             trial_stim_index = weightByte + 3; // 13, 33, 53, 73, 103
           }
         }
-        else { // Control trial
-          Serial2.write(byte(0));
-          Serial2.write(byte(2));
+        else { // Control trial 
           states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
           states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
           states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
@@ -1364,7 +1357,7 @@ int send_protocol_to_Bpod_and_Run() {
 
   // Send 'R' to Bpod to run the state machine
   RunStateMatrix();
-  protocol_sent = 1;
+  protocol_sent_run = 1;
   
   bpod_time = millis();
   
@@ -1376,33 +1369,25 @@ int send_protocol_to_Bpod_and_Run() {
 
 
 void MovePole(byte trial_type) {
-   poleLastPos = analogRead(portMotorPos);
-  // halfPos, anteriorPos, posteriorPos, finalPos
+  poleLastPos = analogRead(portMotorPos);
+  // halfPos, leftPos, rightPos, finalPos
   switch (trial_type) {
     case 0: // right
-      if (contingency == 0) {
-        finalPos = S.posteriorPos;
-      } else {
-        finalPos = S.anteriorPos;
-      }
+      finalPos = S.rightPos;
       break;
     case 1: // left
-      if (contingency == 0) {
-        finalPos = S.anteriorPos;
-      } else {
-        finalPos = S.posteriorPos;
-      }
+      finalPos = S.leftPos;
       break;
     case 2: // either
       if (random(100) < 50) {
-        finalPos = S.posteriorPos;
+        finalPos = S.rightPos;
       } else {
-        finalPos = S.anteriorPos;
+        finalPos = S.leftPos;
       }
       break;
   }
   
-  halfPos = (S.anteriorPos + S.posteriorPos)/2;
+  halfPos = (S.rightPos + S.leftPos)/2;
   analogWrite(portMotorPole, halfPos);
   delay(1000);
   
@@ -1423,7 +1408,7 @@ void MovePole(byte trial_type) {
 	SerialUSB.print("/");
 	SerialUSB.println(polePos);
   }
-  
+	
   if (abs(polePos-poleLastPos) < 50) {
 	lastFailure=1;
   }else{	
@@ -1442,81 +1427,13 @@ void MovePole(byte trial_type) {
 	lastFailure = 0;
 	write_SD_para_S();
 	if (SerialUSB.dtr() && SerialUSB_connected()) {
-	  SerialUSB.println("Q: pole motor has problem ");
+		SerialUSB.println("Q: pole motor has problem ");
 	}
   }		
 }
 
 
-int Read_Data_from_Bpod() {
-  Timer4.start(); // in case of get struck in receiving data
-  Receiving_data_from_Bpod = 1;
-  byte opCode = Serial1.read();
-  if (opCode == 1) {
-    // Receive time stamps.
-    //unsigned long trialStartTimeStamp = Serial1ReadLong();
-    //unsigned long matrixStartTimeStamp = Serial1ReadLong();
-    nEvents = Serial1ReadShort();
-    //SerialUSB.println(nEvents);
-    if (nEvents > 1024) {
-      nEvents = 1024;
-    }
-    //unsigned long eventTimeStamps[1024] = {};
-    //byte Events[1024] = {};
-    for (int i = 0; i < nEvents; i++) {
-      Events[i] = Serial1ReadByte();
-      eventTimeStamps[i] = Serial1ReadLong();
-    }
-    //SerialUSB.println("Receive TimeStamps fini...");
-    // Receiving state visited in this trial
-    //byte state_visited[1024] = {};
-    nTransition = Serial1ReadShort();
-    //SerialUSB.println(nTransition);
-    if (nTransition > 1024) {
-      nTransition = 1024;
-    }
-    for (int i = 0; i < nTransition; i++) {
-      state_visited[i] = Serial1ReadByte();
-    }
-  } else { // error reading Bpod data...
-    //SerialUSB.println(opCode);
-    //delay(1000);
-    //while (Serial1.available()) {
-    //Serial1.read(); // clear serial1 dirty data
-    //}
-    nEvents = 0; nTransition = 0;
-    if (SerialUSB.dtr() && SerialUSB_connected()) {
-      SerialUSB.println("E: Receiving Bpod Data Error...");
-    }
-  }
-
-  if (isStruck == 1) {
-    isStruck = 0;
-    if (SerialUSB.dtr() && SerialUSB_connected()) {
-      SerialUSB.println("E: Get struck in receiving Bpod data.");
-    }
-  }
-
-  if (Serial1.available()) {
-    delay(1000);
-    while (Serial1.available()) {
-      Serial1.read(); // clear serial1 dirty data
-    }
-  }
-
-  Receiving_data_from_Bpod = 0;
-  Timer4.stop(); // in case of get struck in receiving data
-  /*
-    // And send to PC. fast < 10 ms
-    //unsigned long startMillis = millis();
-    SerialUSB.write('E'); // Event and timestamp
-    SerialUSBWriteShort(nEvents);
-    for (int i = 0; i < nEvents; i++) {
-    SerialUSB.write(Events[i]);
-    SerialUSBWriteLong(eventTimeStamps[i]);//
-    }
-    //SerialUSB.println(millis() - startMillis);
-  */
+int write_SD_eventST_updateOutcome() {
   // write event to SD card
   File dataFile = SD.open("eventsT.txt", O_CREAT | O_APPEND | O_WRITE);
   if (dataFile) {
@@ -1679,9 +1596,6 @@ void PrintResult2PC() {
     SerialUSB.print(S.Trial_Outcome);
     SerialUSB.print("; Reward No.:");
     SerialUSB.println(S.totoal_reward_num);
-    //SerialUSB.print("Perf30      : ");
-    //SerialUSB.print(S.ProtocolHistory[S.ProtocolHistoryIndex].performance);
-    //SerialUSB.println("%");
 
     if (F.trig_counter <= trigger_num_before_fix || S.FB_motor_position > S.FB_final_position) {
       SerialUSB.print("M: Motor Pos: ");
@@ -1722,19 +1636,12 @@ int UpdatePerformance() {
   S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials++;
 
   Perf100 = 0;
-  byte response_trial = 100;
   for (int i = 0; i < RECORD_TRIALS; i++) {
-    if (S.OutcomeHistory[i] == 0) {
-      response_trial = response_trial - 1;
-    } else {
-      if (S.OutcomeHistory[i] == 1) {
-        Perf100++;
-      }
+    if (S.OutcomeHistory[i] == 1) {
+      Perf100++;
     }
   }
-  Perf100 = round(100 * (float)Perf100 / response_trial);
 }
-
 
 
 /*
@@ -1753,47 +1660,10 @@ int autoChangeProtocol() {
     case 0:
       // determine TrialType
       if (S.FB_motor_position < 60 + S.FB_final_position && S.FB_motor_position > S.FB_final_position) {
-        S.Autolearn = 0; // either side will be rewarded
+        S.Autolearn = 0; // eigher side will be rewarded
       } else {
         S.Autolearn = 1; // 'ON': 3 left, 3 right
       }
-
-      //      if (S.FB_motor_position > 50) { // start from autolearn ON
-      //        S.Autolearn = 1;
-      //      }
-      //      if (S.Autolearn == 1 && S.FB_motor_position < 10 && F.fixation_duration <= 10000) {
-      //        S.Autolearn = 0; // change from 'ON' to 'either'
-      //      }
-      //      if (S.Autolearn == 0 && F.fixation_duration > 10000) {
-      //        S.Autolearn = 1; // change from 'either' to 'ON'
-      //      }
-
-      /*       // determine DelayPeriod
-            switch (S.random_delay_duration) {
-              case 1001:
-                if (F.fixation_duration > 10000) {
-                  S.random_delay_duration = 2001;
-                }
-                break;
-              case 2001:
-                if (F.fixation_duration > 13000) {
-                  S.random_delay_duration = 3001;
-                }
-                break;
-              case 3001:
-                if (F.fixation_duration > 20000) {
-                  S.random_delay_duration = 4001;
-                }
-                break;
-              case 4001:
-                if (F.fixation_duration > 22000) {
-                  S.random_delay_duration = 5001;
-                }
-                break;
-              default:
-                S.random_delay_duration = 3001;
-                break;
-            } */
 
       // determine if advance motor
       if (S.FB_motor_position > S.FB_final_position) {
@@ -1835,10 +1705,6 @@ int autoChangeProtocol() {
               delay(100);
             }
           }
-          //          Ev.events_id[Ev.events_num] = 5; // motor advance
-          //          Ev.events_time[Ev.events_num] = millis();
-          //          Ev.events_value[Ev.events_num] = S.FB_motor_position;
-          //          Ev.events_num ++;
           if (SerialUSB.dtr() && SerialUSB_connected()) {
             SerialUSB.print("M: Motor advanced to ");
             SerialUSB.print(S.FB_motor_position);
@@ -1876,18 +1742,6 @@ int autoChangeProtocol() {
       }
       break;
 
-    /*     case 2: // P_SAMPLE-2: autoLearn ON, SamplePeriod = 0.75, w/o error trial
-          if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 100) { // if  ran > 100 trials
-            S.ProtocolHistoryIndex = 3;
-            S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
-            S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-            S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-            S.SamplePeriod        = 0.75;
-            S.TimeOut             = 0.50;
-            S.Autolearn           = 1;    // autoLearn ON
-          }
-          break; */
-
     case 3: // P_SAMPLE-3: autoLearn ON, SamplePeriod = 0.75, w/ error trial (timeout = 0.5 sec)
       if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 200) {
         S.ProtocolHistoryIndex = 4;
@@ -1896,7 +1750,7 @@ int autoChangeProtocol() {
         S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
         S.SamplePeriod        = 1.30;
         S.DelayPeriod         = 0.3;   // in sec
-        S.TimeOut             = 3.00;
+        S.TimeOut             = 2.00;
         S.Autolearn = 2; // antiBias
       }
       break;
@@ -1910,115 +1764,10 @@ int autoChangeProtocol() {
         S.ProtocolType        = P_DELAY;
         S.SamplePeriod        = 1.30;  // in sec
         S.DelayPeriod         = 0.3;   // in sec
-        S.TimeOut             = 4.0;
+        S.TimeOut             = 3.0;
         S.Autolearn           = 2;     // antiBias
       }
       break;
-
-    /* case 5: // P_SAMPLE-5: autoLearn Antibias, SamplePeriod = 1.0, w/ timeout = 0.5 sec
-      if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 100 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
-        S.ProtocolHistoryIndex = 6;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.3;
-        S.TimeOut             = 0.50;
-        S.Autolearn           = 2; // antiBias
-      }
-      break;
-
-      case 6: // P_SAMPLE-6: autoLearn Antibias, SamplePeriod = 1.2, w/ timeout = 0.5 sec
-      if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 100 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
-        S.ProtocolHistoryIndex = 7;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.3;
-        S.TimeOut             = 1.0;
-        S.Autolearn           = 2; // antiBias
-      }
-      break;
-
-      case 7: // P_SAMPLE-7: autoLearn Antibias, SamplePeriod = 1.2, w/ timeout = 1.0 sec
-      if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 100 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
-        S.ProtocolHistoryIndex = 8;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.3;
-        S.TimeOut             = 1.5;
-        S.Autolearn           = 2; // antiBias
-      }
-      break;
-
-      case 8: // P_SAMPLE-8: autoLearn Antibias, SamplePeriod = 1.2, w/ timeout = 2.0 sec
-      if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 100 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
-        S.ProtocolHistoryIndex = 9;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_SAMPLE;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 1.3;
-        S.TimeOut             = 2.0;
-        S.Autolearn           = 2; // antiBias
-      }
-      break;
-
-      case 9: // P_SAMPLE-9: autoLearn Antibias, SamplePeriod = 1.2, w/ timeout = 4.0 sec
-      if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 100 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
-        S.ProtocolHistoryIndex = 10;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.ProtocolType         = P_DELAY;
-        S.SamplePeriod         = 0.75;  // in sec
-        S.DelayPeriod          = 0.1;   // in sec
-        S.TimeOut              = 2.0;
-        S.Autolearn            = 2; // antiBias
-
-        //S.struggle_enable      = 0;
-        F.fixation_duration = 30000;
-        para_F_changed = 1;
-      }
-      break;
-
-      case 10: // P_DELAY-10: SamplePeriod = 0.75, DelayPeriod = 0.1
-      if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 200 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
-        S.ProtocolHistoryIndex = 11;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod        = 0.75;  // in sec
-        S.DelayPeriod         = 0.3;   // in sec
-        S.TimeOut             = 2.0;
-        S.Autolearn           = 2;     // antiBias
-      }
-      break;
-
-      case 11: // P_DELAY-11: SamplePeriod = 0.75, DelayPeriod = 0.3
-      if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 300 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
-        S.ProtocolHistoryIndex = 12;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod = 1.0;  // in sec
-        S.DelayPeriod  = 0.3;   // in sec
-        S.TimeOut             = 2.0;
-        S.Autolearn           = 2; // antiBias
-      }
-      break;
-
-      case 12: // P_DELAY-12: SamplePeriod = 1.0, DelayPeriod = 0.3
-      if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 100 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
-        S.ProtocolHistoryIndex = 13;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].Protocol = P_DELAY;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials = 0;
-        S.ProtocolHistory[S.ProtocolHistoryIndex].performance = 0;
-        S.SamplePeriod  = 1.2;   // in sec
-        S.DelayPeriod  = 0.3;   // in sec
-        S.TimeOut             = 2.0;
-        S.Autolearn           = 2; // antiBias
-      }
-      break; */
 
     case 13: // P_DELAY-13: SamplePeriod = 1.2, DelayPeriod = 0.3
       if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 100 && S.ProtocolHistory[S.ProtocolHistoryIndex].performance > 70) {
@@ -2104,28 +1853,6 @@ int autoChangeProtocol() {
       if (S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials > 3000 && Perf100 > 100) {
         // ...
       }
-      contingency_trial = contingency_trial + 1;
-	  if (SerialUSB.dtr() && SerialUSB_connected()) {
-		SerialUSB.print("M: contingency: ");
-		SerialUSB.print(contingency);
-		SerialUSB.print("; contingency_trial: ");
-		SerialUSB.println(contingency_trial);
-	  }
-      if (contingency_trial > 300 && Perf100 > 75) {
-        contingency_trial = 0;
-        if (contingency == 0) {
-          contingency = 1;
-        } else {
-          contingency = 0;
-        }
-        reverse_num = reverse_num + 1;
-		if (SerialUSB.dtr() && SerialUSB_connected()) {
-			SerialUSB.print("M: contingency changed to: ");
-			SerialUSB.print(contingency);
-			SerialUSB.print(", reverse number: ");
-			SerialUSB.println(reverse_num);
-		}
-      }
       break;
 
     default:
@@ -2199,11 +1926,6 @@ void autoAdjustLickportPosition() {
           SerialUSB.print(" -> ");
           SerialUSB.println(S.LR_motor_position);
         }
-
-        //        Ev.events_id[Ev.events_num] = 6; // left/right motor move
-        //        Ev.events_time[Ev.events_num] = millis();
-        //        Ev.events_value[Ev.events_num] = S.LR_motor_position;
-        //        Ev.events_num ++;
 
         analogWrite(portMotorLR, S.LR_motor_position);
       }
@@ -2383,7 +2105,6 @@ int trialSelection() {
             S.TrialType = 0;
           }
         } else { // Haven't reached MaxSame limits yet, choose at random:
-          //randomSeed(analogRead(0));
           if (random(100) <= (NoTrialProb * 100)) {
             S.TrialType = 1;
           } else {
@@ -2414,7 +2135,7 @@ int trialSelection() {
 void switch_fixation_state() {
   switch (timer_state) {
     case CHECK_TRIG:
-      if (SwitchL_CurrentStatus == 0 && SwitchR_CurrentStatus == 0 && (SwitchL_LastStatus == 1 || SwitchR_LastStatus == 1 )) {
+		if (SwitchL_CurrentStatus == 0 && SwitchR_CurrentStatus == 0 && (SwitchL_LastStatus == 1 || SwitchR_LastStatus == 1 )) {
         // switch triggered
         F.trig_counter++;
         para_F_changed = 1;
@@ -2424,12 +2145,12 @@ void switch_fixation_state() {
         Ev.events_value[Ev.events_num] = -1;
         Ev.events_num ++;
         if (SerialUSB.dtr() && SerialUSB_connected()) {
-          SerialUSB.print("M: Switch status: ");
-          SerialUSB.print(SwitchL_CurrentStatus);
-          SerialUSB.print(SwitchR_CurrentStatus);
-          SerialUSB.print(SwitchL_LastStatus);
-          SerialUSB.print(SwitchR_LastStatus);
-          SerialUSB.print("M: Switch triggered NO. ");
+		  SerialUSB.print("M: Switch status: ");
+		  SerialUSB.print(SwitchL_CurrentStatus);
+		  SerialUSB.print(SwitchR_CurrentStatus);
+		  SerialUSB.print(SwitchL_LastStatus);
+		  SerialUSB.print(SwitchR_LastStatus);
+		  SerialUSB.print("M: Switch triggered NO. ");
           SerialUSB.println(F.trig_counter);
         }
         if (F.trig_counter > trigger_num_before_fix && S.FB_motor_position <= S.FB_final_position) {
@@ -2437,9 +2158,9 @@ void switch_fixation_state() {
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("DELAY_TO_FIX");
           last_state_time = millis();
-        } else {
-          timer_state = CHECK_RELEASE0;
-        }
+        }else{
+			timer_state = CHECK_RELEASE0;
+		}			
       }
       break;
 
@@ -2456,11 +2177,6 @@ void switch_fixation_state() {
         analogWrite(DAC0, regulatorVal_min);
         is_max_pressure = 0;
 
-        //          for (int i = 0; i < 39; i++) {
-        //            weighting_info[i] = weighting_info[i + 1];
-        //          }
-
-
         F.headfixation_counter ++;
         para_F_changed = 1;
 
@@ -2470,9 +2186,6 @@ void switch_fixation_state() {
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = regulatorVal_min;
           Ev.events_num ++;
-
-          //            weighting_info[39] = 2000;
-          //            weight_counter++;
           if (SerialUSB.dtr() && SerialUSB_connected()) {
             SerialUSB.print("M: Head fixation (again) NO. ");
             SerialUSB.print(F.headfixation_counter);
@@ -2491,8 +2204,6 @@ void switch_fixation_state() {
           Ev.events_value[Ev.events_num] = regulatorVal_min;
           Ev.events_num ++;
 
-          //            weighting_info[39] = 1000;
-          //            weight_counter++;
           if (SerialUSB.dtr() && SerialUSB_connected()) {
             SerialUSB.print("M: Head fixation NO. ");
             SerialUSB.print(F.headfixation_counter);
@@ -2537,13 +2248,6 @@ void switch_fixation_state() {
           analogWrite(DAC0, regulatorVal_release);
           headfixation_flag = 0;
 
-          //            for (int i = 0; i < 39; i++) {
-          //              weighting_info[i] = weighting_info[i + 1];
-          //            }
-          //            weighting_info[39] = -2000;
-          //            weight_counter++;
-
-
           Ev.events_id[Ev.events_num] = 12; // headfixation release3: struggle
           Ev.events_time[Ev.events_num] = millis();
           Ev.events_value[Ev.events_num] = (millis() - last_state_time);
@@ -2556,26 +2260,11 @@ void switch_fixation_state() {
             SerialUSB.println(" g, DETECTED.");
           }
           timer_state = STRUGGLE_DELAY_1000;
-          //SerialUSB.print("Headfixation state changed to: ");
-          //SerialUSB.println("STRUGGLE_DELAY_1000");
-          // stop the trial
-          //          if (S.ProtocolHistoryIndex > 0) {
-          //            if (protocol_sent == 1) {
-          //              protocol_sent = 0;
-          //              Serial1.write('X'); // stop Bpod
-          //            }
-          //          }
           last_state_time = millis();
         } else if (SwitchL_CurrentStatus == 1 || SwitchR_CurrentStatus == 1) {
           // escape
           analogWrite(DAC0, regulatorVal_release);
           headfixation_flag = 0;
-
-          //            for (int i = 0; i < 39; i++) {
-          //              weighting_info[i] = weighting_info[i + 1];
-          //            }
-          //            weighting_info[39] = -1500;
-          //            weight_counter++;
 
           Ev.events_id[Ev.events_num] = 10; // headfixation release2: escape
           Ev.events_time[Ev.events_num] = millis();
@@ -2589,7 +2278,7 @@ void switch_fixation_state() {
             F.Fixation_Outcome[19] = 10;
             para_F_changed = 1;
           }
-          if (SerialUSB.dtr() && SerialUSB_connected()) {
+          if (SerialUSB.dtr() && SerialUSB_connected()) {   
             SerialUSB.print("M: Released - escape!, interval: ");
             SerialUSB.print(Ev.events_value[Ev.events_num - 1] / 1000);
             SerialUSB.print("; ");
@@ -2600,25 +2289,12 @@ void switch_fixation_state() {
           timer_state = ESCAPE_DELAY_1000;
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("ESCAPE_DELAY_1000");
-          // stop the trial
-          //          if (S.ProtocolHistoryIndex > 0) {
-          //            if (protocol_sent == 1) {
-          //              protocol_sent = 0;
-          //              Serial1.write('X'); // stop Bpod
-          //            }
-          //          }
           last_state_time = millis();
         } else if (millis() - last_state_time > F.fixation_duration) {
           // timeup
-          if (S.ProtocolHistoryIndex < 1 || protocol_sent == 0 || (millis() - last_state_time > F.fixation_duration + 5000)) {
+          if (S.ProtocolHistoryIndex < 1 || protocol_sent_run == 0 || (millis() - last_state_time > F.fixation_duration + 5000)) {
             analogWrite(DAC0, regulatorVal_release);
             headfixation_flag = 0;
-
-            //              for (int i = 0; i < 39; i++) {
-            //                weighting_info[i] = weighting_info[i + 1];
-            //              }
-            //              weighting_info[39] = -1000;
-            //              weight_counter++;
 
             Ev.events_id[Ev.events_num] = 9; // headfixation release1: timeup
             Ev.events_time[Ev.events_num] = millis();
@@ -2699,18 +2375,6 @@ void switch_fixation_state() {
 
     case ESCAPE_DELAY_1000: // delay a little bit to go back to CHECK_TRIG
       if (millis() - last_state_time > 1000) {
-        //          // if timeup percentage < 25%; decreasing fixation duration
-        //          if (F.fixation_duration > fixation_interval_min && compare_array_sum(F.Fixation_Outcome, 9, 0, 20) < 5 && F.headfixation_counter - F.last_advance_headfixation_counter >= fixation_advance_step) {
-        //            para_F_changed = 1;
-        //
-        //            F.last_advance_headfixation_counter = F.headfixation_counter;
-        //
-        //            F.fixation_duration = F.fixation_duration - fixation_interval_step;
-        //            if (F.fixation_duration < fixation_interval_min) {
-        //              F.fixation_duration = fixation_interval_min; // min head fixation time 15 sec
-        //            }
-        //          }
-
         // Transit state
         timer_state = CHECK_TRIG;
         //SerialUSB.print("Headfixation state changed to: ");
@@ -2719,7 +2383,7 @@ void switch_fixation_state() {
       break;
 
     case TIMEUP_DELAY_1000: // delay some time to see if the switch is still pressed, if so, head fixation again!
-      if (millis() - last_state_time > 1000) {
+      if (millis() - last_state_time > 1000) {		  
         // determine if advance parameter (performance based)
         if (F.fixation_duration < F.fixation_interval_max && compare_array_sum(F.Fixation_Outcome, 9, 0, 20) >= 12 && F.headfixation_counter - F.last_advance_headfixation_counter >= fixation_advance_step) {
           // performance > 60%; increasing fixation duration
@@ -2739,18 +2403,18 @@ void switch_fixation_state() {
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("HEAD_FIXATION");
         } else {
-          timer_state = CHECK_TRIG;
+			timer_state = CHECK_TRIG;
           //SerialUSB.print("Headfixation state changed to: ");
           //SerialUSB.println("CHECK_TRIG");
         }
       }
       break;
-
-    case CHECK_RELEASE0:
-      if (SwitchL_CurrentStatus == 1 && SwitchR_CurrentStatus == 1 && (SwitchL_LastStatus == 0 || SwitchR_LastStatus == 0 )) {
-        timer_state = CHECK_TRIG;
-      }
-      break;
+	  
+	case CHECK_RELEASE0:
+		if (SwitchL_CurrentStatus == 1 && SwitchR_CurrentStatus == 1 && (SwitchL_LastStatus == 0 || SwitchR_LastStatus == 0 )){
+			timer_state = CHECK_TRIG;
+		}
+		break;	
     default:
       break;
   }
@@ -2758,9 +2422,9 @@ void switch_fixation_state() {
 
 
 
-/**************************************************************************************************************/
-/********************************************** SD related Functions *******************************************/
-/**************************************************************************************************************/
+//**************************************************************************************************************/
+//********************************************** SD related Functions *******************************************/
+//**************************************************************************************************************/
 int write_SD_para_F() {
   File dataFile = SD.open("paraF.txt", O_WRITE);
   if (dataFile) {
@@ -2787,8 +2451,8 @@ int write_SD_para_F() {
     dataFile.println(F.headfixation_counter);
     dataFile.print("fixation_interval_max = ");
     dataFile.println(F.fixation_interval_max);
-
-    dataFile.print("weight_offset = ");
+	
+	dataFile.print("weight_offset = ");
     dataFile.println(weight_offset);
 	
 	dataFile.print("calibration_factor = ");
@@ -2804,7 +2468,6 @@ int write_SD_para_F() {
 }
 
 int read_SD_para_F() {
-  //noInterrupts();
   File dataFile = SD.open("paraF.txt", O_READ);
   if (dataFile) {
     dataFile.seek(0);
@@ -2840,8 +2503,8 @@ int read_SD_para_F() {
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     F.fixation_interval_max = buffer_tmp.toInt();
-
-    buffer_tmp = dataFile.readStringUntil('=');
+	
+	buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     weight_offset = buffer_tmp.toInt();
 	
@@ -2855,12 +2518,10 @@ int read_SD_para_F() {
     return -1;
   }
   dataFile.close();
-  //interrupts();
   return 0;
 }
 
 int write_SD_para_S() {
-  //noInterrupts();
   File dataFile = SD.open("paraS.txt", O_WRITE);
   if (dataFile) {
     dataFile.seek(0);
@@ -2952,22 +2613,14 @@ int write_SD_para_S() {
     dataFile.println(S.reward_left);
     dataFile.print("reward_right = ");
     dataFile.println(S.reward_right);
-
-    dataFile.print("contingency = ");
-    dataFile.println(contingency);
-    dataFile.print("contingency_trial = ");
-    dataFile.println(contingency_trial);
 	
-	dataFile.print("pole_anterior_position = ");
-    dataFile.println(S.anteriorPos);
-    dataFile.print("pole_posterior_position = ");
-    dataFile.println(S.posteriorPos);
+	dataFile.print("pole_left_position = ");
+    dataFile.println(S.leftPos);
+    dataFile.print("pole_right_position = ");
+    dataFile.println(S.rightPos);
 	
 	dataFile.print("is_motor_ok = ");
     dataFile.println(isMotorOK);
-	
-	dataFile.print("reverse_num = ");
-    dataFile.println(reverse_num);
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for write");
@@ -2975,12 +2628,10 @@ int write_SD_para_S() {
     return -1;
   }
   dataFile.close();
-  //interrupts();
   return 0;
 }
 
 int read_SD_para_S() {
-  //noInterrupts();
   File dataFile = SD.open("paraS.txt", O_READ);
   if (dataFile) {
     dataFile.seek(0);
@@ -3097,30 +2748,18 @@ int read_SD_para_S() {
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     S.reward_right = buffer_tmp.toFloat();
-
-    buffer_tmp = dataFile.readStringUntil('=');
-    buffer_tmp = dataFile.readStringUntil('\n');
-    contingency = buffer_tmp.toInt();
-
-    buffer_tmp = dataFile.readStringUntil('=');
-    buffer_tmp = dataFile.readStringUntil('\n');
-    contingency_trial = buffer_tmp.toInt();
 	
 	buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
-    S.anteriorPos  = buffer_tmp.toInt();
+    S.leftPos  = buffer_tmp.toInt();
 
     buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
-    S.posteriorPos = buffer_tmp.toInt();
+    S.rightPos = buffer_tmp.toInt();
 	
 	buffer_tmp = dataFile.readStringUntil('=');
     buffer_tmp = dataFile.readStringUntil('\n');
     isMotorOK = buffer_tmp.toInt();
-	
-	buffer_tmp = dataFile.readStringUntil('=');
-    buffer_tmp = dataFile.readStringUntil('\n');
-    reverse_num = buffer_tmp.toInt();
   } else {
     if (SerialUSB.dtr() && SerialUSB_connected()) {
       SerialUSB.println("E: error opening paraS.txt for read");
@@ -3128,7 +2767,6 @@ int read_SD_para_S() {
     return -1;
   }
   dataFile.close();
-  //interrupts();
   return 0;
 }
 
@@ -3155,7 +2793,6 @@ int write_SD_event_fixation() {
 
 // Write Trial Events to SD card
 int write_SD_trial_info() {
-  //noInterrupts();
   File dataFile = SD.open("trials.txt", O_CREAT | O_APPEND | O_WRITE);
   if (dataFile) {
     now = rtc.now();
@@ -3188,11 +2825,6 @@ int write_SD_trial_info() {
     dataFile.print(" ");
     dataFile.print(S.LR_motor_position);
 
-    dataFile.print(" ");
-    dataFile.print(contingency);
-    dataFile.print(" ");
-    dataFile.print(contingency_trial);
-
     for (int i = 0; i < nTransition; i++) {
       dataFile.print(" ");
       dataFile.print(state_visited[i]);
@@ -3206,55 +2838,10 @@ int write_SD_trial_info() {
     return -1;
   }
   dataFile.close();
-  //interrupts();
   return 0;
 }
 
-void send_pars_S_to_PC() { // NOT USED!!!
-  if (SerialUSB.dtr() && SerialUSB_connected()) {
-    //noInterrupts();
-    SerialUSB.write('S'); // Event and timestamp
-    SerialUSB.write((byte*)&S.currentTrialNum, sizeof(unsigned int));
-    SerialUSB.write((byte*)&S.FB_motor_position, sizeof(int));
-    SerialUSB.write(S.ProtocolType);
-    SerialUSB.write(S.Autolearn);
-    SerialUSB.write(S.TrialType);
-    SerialUSB.write((byte*)&S.random_delay_duration, sizeof(int));
-    SerialUSB.write(S.Trial_Outcome);
-
-    SerialUSB.write((byte*)&S.SamplePeriod, sizeof(float));
-    SerialUSB.write((byte*)&S.DelayPeriod, sizeof(float));
-    SerialUSB.write((byte*)&S.TimeOut, sizeof(float));
-    SerialUSB.write(S.ProtocolHistoryIndex);
-    /*
-      for (int i = 0; i < 20; i++) {
-      SerialUSB.write(S.ProtocolHistory[i].Protocol);
-      SerialUSB.write((byte*)&S.ProtocolHistory[i].nTrials, sizeof(unsigned int));
-      SerialUSB.write(S.ProtocolHistory[i].performance);
-      }
-    */
-    SerialUSB.write(S.GaveFreeReward.flag_R_water);
-    SerialUSB.write(S.GaveFreeReward.flag_L_water);
-    SerialUSB.write((byte*)&S.GaveFreeReward.past_trials, sizeof(unsigned int));
-
-    /* not necessary for PC
-      for (int i = 0; i < RECORD_TRIALS; i++) {
-    	SerialUSB.write(S.ProtocolTypeHistory[i]);
-    	SerialUSB.write(S.TrialTypeHistory[i]);
-    	SerialUSB.write(S.OutcomeHistory[i]);
-      }
-    */
-
-    //SerialUSB.write(S.struggle_enable);
-    //SerialUSB.write((byte*)&S.totoal_reward_num, sizeof(unsigned int));
-    //SerialUSB.write(S.retract_times);
-
-    //interrupts();
-  }
-}
-
 int send_PC_trials_24hr() {
-  //noInterrupts();
   unsigned long time_stamp;
   unsigned int trial_num;
   byte trial_type;
@@ -3295,7 +2882,6 @@ int send_PC_trials_24hr() {
     return -1;
   }
   dataFile.close();
-  //interrupts();
   return 0;
 }
 
@@ -3436,14 +3022,10 @@ int AddState(StateMatrix * sma, State * state) {
     for (int i = 0; i < 40; i++) {
       sma->InputMatrix[CurrentState][i] = CurrentState;
     }
-    for (int i = 0; i < 5; i++) {
-      sma->GlobalTimerMatrix[CurrentState][i] = CurrentState;
-      sma->GlobalCounterMatrix[CurrentState][i] = CurrentState;
-    }
 
     // Add state transitions.
     for (int i = 0; i < state->nStateChangeConditions; i++) {
-      int CandidateEventCode = find_idx(EventNames, 50, state->StateChangeCondition[i].StateChangeTrigger);
+      int CandidateEventCode = find_idx(EventNames, 40, state->StateChangeCondition[i].StateChangeTrigger);
       if (CandidateEventCode < 0) {
         sma->nStates--;
         return -1;
@@ -3451,38 +3033,12 @@ int AddState(StateMatrix * sma, State * state) {
       String TargetState = state->StateChangeCondition[i].StateChangeTarget;
       int TargetStateNumber = 0;
       if (TargetState.compareTo("exit") == 0) {
-        TargetStateNumber = sma->nStates; //;
+        TargetStateNumber = sma->nStates; 
       } else {
         TargetStateNumber = find_idx(sma->StateNames, sma->nStates, TargetState);
       }
 
-      if (CandidateEventCode > 39) {
-        String CandidateEventName = state->StateChangeCondition[i].StateChangeTrigger;
-        if (CandidateEventName.length() > 4) {
-          if (CandidateEventName.endsWith("_End")) {
-            if (CandidateEventCode < 45) {
-              int GlobalTimerNumber = CandidateEventName.substring(CandidateEventName.length() - 5, CandidateEventName.length() - 4).toInt();
-              if (GlobalTimerNumber < 1 || GlobalTimerNumber > 5) {
-                sma->nStates--;
-                return -1;
-              }
-              sma->GlobalTimerMatrix[CurrentState][GlobalTimerNumber] = TargetStateNumber;
-            } else {
-              int GlobalCounterNumber = CandidateEventName.substring(CandidateEventName.length() - 5, CandidateEventName.length() - 4).toInt();
-              if (GlobalCounterNumber < 1 || GlobalCounterNumber > 5) {
-                sma->nStates--;
-                return -1;
-              }
-              sma->GlobalCounterMatrix[CurrentState][GlobalCounterNumber] = TargetStateNumber;
-            }
-          } else {
-            sma->nStates--;
-            return -1;
-          }
-        }
-      } else {
-        sma->InputMatrix[CurrentState][CandidateEventCode] = TargetStateNumber;
-      }
+      sma->InputMatrix[CurrentState][CandidateEventCode] = TargetStateNumber;
     }
 
 
@@ -3491,23 +3047,6 @@ int AddState(StateMatrix * sma, State * state) {
       sma->OutputMatrix[CurrentState][i] = 0;
     }
     for (int i = 0; i < state->nOutputs; i++) {
-      int MetaAction = find_idx(MetaActions, 4, state->Output[i].OutputType);
-      if (MetaAction >= 0) {
-        int Value = state->Output[i].Value;
-        switch (MetaAction) {
-          case 1: { // VALVE
-              Value = pow(2, Value - 1);
-              sma->OutputMatrix[CurrentState][1] = Value;
-            }
-            break;
-          case 2: { // LED
-              sma->OutputMatrix[CurrentState][9 + Value] = 255;
-              break;
-            }
-          case 3: // LED STATE
-            break;
-        }
-      } else {
         int TargetEventCode = find_idx(OutputActionNames, 17, state->Output[i].OutputType);
         if (TargetEventCode >= 0) {
           int Value = state->Output[i].Value;
@@ -3516,7 +3055,6 @@ int AddState(StateMatrix * sma, State * state) {
           sma->nStates--;
           return -1;
         }
-      }
     }
 
     // Add self timer.
@@ -3528,7 +3066,7 @@ int AddState(StateMatrix * sma, State * state) {
 }
 
 
-/**
+/*
    Arguments:
       sma - Pointer to the state machine
 
@@ -3540,120 +3078,30 @@ int AddState(StateMatrix * sma, State * state) {
       This function will add the exit code to the state machine.
       After that, it will send the state machine to Bpod in bytes.
 */
-int SendStateMatrix(StateMatrix * sma) {
-  // clear serial
-  if (Serial1.available()) {
-    delay(1000);
-    while (Serial1.available()) {
-      Serial1.read(); // clear serial1 dirty data
-    }
-  }
-
-  //SerialUSB.println("Start Sending.");
-  byte stateNum = sma->nStates;
-  byte output[2048];
-  int index = 0;
-
-  output[index++] = 'P';
-
-  output[index++] = stateNum;
-
+ int SendStateMatrix(StateMatrix * sma) {		
+  stateNum = sma->nStates;
   for (int i = 0; i < stateNum; i++) {
     for (int j = 0; j < 40; j++) {
-      // output[index++] = (sma->InputMatrix[i][j] == 255) ? stateNum : sma->InputMatrix[i][j];
-      output[index++] = sma->InputMatrix[i][j];
+	  InputStateMatrix[i][j] = sma->InputMatrix[i][j];
     }
   }
 
   for (int i = 0; i < stateNum; i++) {
     for (int j = 0; j < 17; j++) {
-      output[index++] = sma->OutputMatrix[i][j];
+	  OutputStateMatrix[i][j] = sma->OutputMatrix[i][j];
     }
-  }
-
-  for (int i = 0; i < stateNum; i++) {
-    for (int j = 0; j < 5; j++) {
-      output[index++] = sma->GlobalTimerMatrix[i][j];
-    }
-  }
-
-  for (int i = 0; i < stateNum; i++) {
-    for (int j = 0; j < 5; j++) {
-      output[index++] = sma->GlobalCounterMatrix[i][j];
-    }
-  }
-
-  for (int i = 0; i < 5; i++) {
-    output[index++] = sma->GlobalCounterEvents[i];
   }
 
   for (int i = 0; i < 8; i++) {
-    output[index++] = PortInputsEnabled[i];
+	PortInputsEnabled[i] = PortInputsEnabled[i];
   }
 
-  for (int i = 0; i < 4; i++) {
-    output[index++] = WireInputsEnabled[i];
-  }
-
-  for (int i = 0; i < stateNum; i++) {
-    unsigned long ConvertedTimer = sma->StateTimers[i] * TimerScaleFactor;
-    ForthByte = (ConvertedTimer & 0xff000000UL) >> 24;
-    ThirdByte = (ConvertedTimer & 0x00ff0000UL) >> 16;
-    SecondByte = (ConvertedTimer & 0x0000ff00UL) >> 8;
-    LowByte = (ConvertedTimer & 0x000000ffUL);
-    output[index++] = LowByte;
-    output[index++] = SecondByte;
-    output[index++] = ThirdByte;
-    output[index++] = ForthByte;
-  }
-
-  for (int i = 0; i < 5; i++) {
-    unsigned long ConvertedTimer = sma->GlobalTimers[i] * TimerScaleFactor;
-    ForthByte = (ConvertedTimer & 0xff000000UL) >> 24;
-    ThirdByte = (ConvertedTimer & 0x00ff0000UL) >> 16;
-    SecondByte = (ConvertedTimer & 0x0000ff00UL) >> 8;
-    LowByte = (ConvertedTimer & 0x000000ffUL);
-    output[index++] = LowByte;
-    output[index++] = SecondByte;
-    output[index++] = ThirdByte;
-    output[index++] = ForthByte;
-  }
-
-  for (int i = 0; i < 5; i++) {
-    ForthByte = (sma->GlobalCounterThresholds[i] & 0xff000000UL) >> 24;
-    ThirdByte = (sma->GlobalCounterThresholds[i] & 0x00ff0000UL) >> 16;
-    SecondByte = (sma->GlobalCounterThresholds[i] & 0x0000ff00UL) >> 8;
-    LowByte = (sma->GlobalCounterThresholds[i] & 0x000000ffUL);
-    output[index++] = LowByte;
-    output[index++] = SecondByte;
-    output[index++] = ThirdByte;
-    output[index++] = ForthByte;
-  }
-
-  //SerialUSB.println(index); // 1195 for Protocol 5
-  //SerialUSB.println(millis());
-  for (int i = 0; i < index; i++) {
-    //while (Serial1.availableForWrite() == 0) {
-    //SerialUSB.println("Buffer maxed.");
-    //}
-    Serial1.write(output[i]);
-    //Serial1.flush();
-    //delayMicroseconds(10);
-  }
-  //SerialUSB.println(millis());
-
-  //SerialUSB.println("Done Sending.");
-  byte returnVal = Serial1ReadByte();
-  if (returnVal != 1) {
-    // SerialUSB.print(returnVal);
-    if (SerialUSB.dtr() && SerialUSB_connected()) {
-      SerialUSB.println("E: SendStateMachine failed.");
-    }
-    return -1;
+  for (int i = 0; i < stateNum; i++) {	
+	StateTimers[i] = sma->StateTimers[i]* TimerScaleFactor;
   }
   return 0;
 }
-
+ 
 /*
    Arguments:
       N/A
@@ -3667,29 +3115,42 @@ int SendStateMatrix(StateMatrix * sma) {
       Meanwhile, it will read the Bpod event logs.
 */
 int RunStateMatrix() {
-  // Sending indicator 'R'
-  Serial1.write('R');
-  byte returnVal = Serial1ReadByte();
-  if ( returnVal != 1) {
-    // SerialUSB.print(returnVal);
-    if (SerialUSB.dtr() && SerialUSB_connected()) {
-      SerialUSB.println("E: Failed attempt to run state matrix (!= 1)");
-    }
-    return -1;
-  }
-  return 0;
+	analogWrite(ledPin, 100);
+	NewStateIdx = 0;
+	CurrentState = 0;
+	nEvents = 0;
+	MatrixFinished = false;
+			
+	// Read initial state of sensors
+	for (int x = 0; x < 8; x++) {
+		if (PortInputsEnabled[x] == 1) {
+			PortInputLineValue[x] = digitalRead(PortDigitalInputLines[x]);
+			if (PortInputLineValue[x] == HIGH) {
+				PortInputLineLastKnownStatus[x] = HIGH; // Update last known state of input line
+			} else {
+				PortInputLineLastKnownStatus[x] = LOW;
+			}
+		} else {
+			PortInputLineLastKnownStatus[x] = LOW;
+			PortInputLineValue[x] = LOW;
+		}
+		PortInputLineOverride[x] = false;
+	}
+			
+	MatrixStartTime = millis();;
+	StateStartTime = MatrixStartTime;
+	CurrentTime = MatrixStartTime;
+
+	nTransition = 0;
+	state_visited[nTransition++] = CurrentState;
+
+	// Adjust outputs, scheduled waves, Serial codes and sync port for first state
+	setStateOutputs(CurrentState);
+	Timer3.start(); // Runs every 100us
+			
+return 0;
 }
 
-
-
-void digitalWriteDirect(int pin, boolean val) {
-  if (val) g_APinDescription[pin].pPort -> PIO_SODR = g_APinDescription[pin].ulPin;
-  else    g_APinDescription[pin].pPort -> PIO_CODR = g_APinDescription[pin].ulPin;
-}
-
-byte digitalReadDirect(int pin) {
-  return !!(g_APinDescription[pin].pPort -> PIO_PDSR & g_APinDescription[pin].ulPin);
-}
 
 int sum_array(byte a [], int array_length) {
   int res = 0;
@@ -3717,47 +3178,12 @@ int compare_array_sum(byte array1 [], byte oprant1, int start_ind, int end_ind) 
   return num;
 }
 
-void valve_control(byte on_off) {
-  Serial1.write('O');
-  Serial1.write('V');
-  Serial1.write(on_off); // 0: both off; 1:left open; 2:right open; 3: both open
+void valve_control(byte on_off) { //0: both off; 1:left open; 2:right open; 3: both open 
+  for (int x = 0; x < 2; x++) {
+	digitalWrite(ValveDigitalOutputLines[x], bitRead(on_off, x));
+  }
 }
 
-// This function will read in an unsigned long number from Bpod.
-unsigned long Serial1ReadLong() {
-  while (Serial1.available() == 0) {}
-  LowByte = Serial1.read();
-  while (Serial1.available() == 0) {}
-  SecondByte = Serial1.read();
-  while (Serial1.available() == 0) {}
-  ThirdByte = Serial1.read();
-  while (Serial1.available() == 0) {}
-  ForthByte = Serial1.read();
-  unsigned long LongInt =  (unsigned long)(((unsigned long)ForthByte << 24) | ((unsigned long)ThirdByte << 16) | ((unsigned long)SecondByte << 8) | ((unsigned long)LowByte));
-  return LongInt;
-}
-
-// This function will read in an unsigned short number from Bpod.
-uint16_t Serial1ReadShort() {
-  while (Serial1.available() == 0) {}
-  LowByte = Serial1.read();
-  while (Serial1.available() == 0) {}
-  SecondByte = Serial1.read();
-  uint16_t ShortInt =  (uint16_t)(((uint16_t)SecondByte << 8) | ((uint16_t)LowByte));
-  return ShortInt;
-}
-
-// This function will read in a byte from Bpod.
-byte Serial1ReadByte() {
-  while (Serial1.available() == 0) {}
-  LowByte = Serial1.read();
-  return LowByte;
-}
-
-/*
-  Serial.write( (uint8_t *) &x, sizeof( x ) );
-  int x = Serial.read() | ( Serial.read() << 8 );
-*/
 
 byte SerialUSBReadByte() {
   while (SerialUSB.available() == 0) {}
@@ -3771,23 +3197,12 @@ void SerialUSBWriteLong(unsigned long num) { // NOT USED
   SerialUSB.write((byte)(num >> 8));
   SerialUSB.write((byte)(num >> 16));
   SerialUSB.write((byte)(num >> 24));
-  //delayMicroseconds(100);
 }
 
 // write an unsigned short number to PC
 void SerialUSBWriteShort(word num) {
   SerialUSB.write((byte)num);
   SerialUSB.write((byte)(num >> 8));
-  //delayMicroseconds(100);
-}
-
-void Incase_handler() {
-  Timer4.stop();
-  isStruck = 1;
-  if (Receiving_data_from_Bpod == 1) { // get struck in receiving Bpod data
-    // Send 'K' to Bpod to have Bpod send back many bytes to get controller out of struck
-    Serial1.write('K');
-  }
 }
 
 void printCurrentTime() {
@@ -3809,41 +3224,6 @@ void printCurrentTime() {
   }
 }
 
-void handshake_with_bpod() {
-  int HSNum = 0;
-  isHandshake = 0;
-  usbWflag=0;
-  while (!isHandshake) {
-    watchdogReset();
-    Serial1.write('6'); // handshake with Bpod
-    delay(100);
-    while (!Serial1.available()) {
-	  watchdogReset();
-	  HSNum++;
-      if (SerialUSB.dtr() && SerialUSB_connected()) {
-        SerialUSB.println("E: Trying to handshake with Bpod...");
-      }
-	  if (HSNum < 5) {
-		delay(5000);
-		Serial1.write('6');
-		delay(100);
-	  }else{		
-		break;
-	  }
-    }
-    if (Serial1.read() != '5') {
-      while (Serial1.available()) {
-        Serial1.read();
-      }
-	  break;
-    } else {
-      ledState = HIGH;
-      digitalWrite(ledPin, ledState);
-      isHandshake = 1;
-    }
-  }
-}
-
 byte SerialUSB_connected() {
   // Check if the usb cable is connected with the PC
   uint32_t Count = (UOTGHS->UOTGHS_DEVFNUM & UOTGHS_DEVFNUM_FNUM_Msk) >> UOTGHS_DEVFNUM_FNUM_Pos;
@@ -3854,3 +3234,150 @@ byte SerialUSB_connected() {
     return 1;
   }
 }
+
+void stopGocue(){
+	pwm_pin53.stop();
+	analogWrite(PortPWMOutputLines[0], 0); 
+}
+
+void stopMaskingflash() {
+	pwm_pin44.stop();
+	analogWrite(PortPWMOutputLines[1], 0); 
+}
+
+void OptoStim() {
+    sample_ind = 0; // first output
+    if (laserByte == 1) {
+      dac.setVoltage(uint16_t(powerWeight * thorlab_flat_sine[0]), false);
+    } else {
+      dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[0] - 655) + 655), false); // 655 is 0.8 V
+    }
+    Timer4.start();
+}
+
+void timer_updateDAC() { // total 1.3 sec stim
+  sample_ind ++;
+  if (laserByte == 1) { // Thorlab laser
+    if (sample_ind < 2400) { // flat cos, 1.2 sec
+      dac.setVoltage(uint16_t(powerWeight * thorlab_flat_sine[sample_ind % 50]), false);
+    } else if (sample_ind < 2600) { // ramp down, 0.1 sec
+      dac.setVoltage(uint16_t(powerWeight * thorlab_ramp_sine[sample_ind - 2400]), false);
+    } else {
+      Timer4.stop();
+      dac.setVoltage(0, false);
+    }
+  } else { // Ultra laser
+    if (sample_ind < 2400) { // flat cos, 1.2 sec
+      dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[sample_ind % 50] - 655) + 655), false); // 655 is 0.8 V
+    } else if (sample_ind < 2600) { // ramp down, 0.1 sec
+      dac.setVoltage(uint16_t(powerWeight * (ultra_ramp_sine[sample_ind - 2400] - 655) + 655), false); // 655 is 0.8 V
+    } else {
+      Timer4.stop();
+      dac.setVoltage(0, false);
+    }
+  }
+}
+
+//////Task function JL 11/19/2024
+void handler() {
+	nCurrentEvents = 0;
+	CurrentEvent[0] = 254; // Event 254 = No event
+	CurrentTime = millis();  //use real time to record the time instead of counting handler visit times.  JL 11/19/2024
+	// Refresh state of sensors and inputs
+	for (int x = 0; x < 8; x++) {
+		if ((PortInputsEnabled[x] == 1) && (!PortInputLineOverride[x])) {
+			PortInputLineValue[x] = digitalRead(PortDigitalInputLines[x]);
+		}
+	}
+		// Determine which port event occurred
+	int Ev = 0; // Since port-in and port-out events are indexed sequentially, Ev replaces x in the loop.
+	for (int x = 0; x < 8; x++) {
+		// Determine port entry events
+		if ((PortInputLineValue[x] == HIGH) && (PortInputLineLastKnownStatus[x] == LOW)) {
+			PortInputLineLastKnownStatus[x] = HIGH;
+			CurrentEvent[nCurrentEvents] = Ev;
+			nCurrentEvents++;
+		}
+		Ev = Ev + 1;
+		// Determine port exit events
+		if ((PortInputLineValue[x] == LOW) && (PortInputLineLastKnownStatus[x] == HIGH)) {
+			PortInputLineLastKnownStatus[x] = LOW;
+			CurrentEvent[nCurrentEvents] = Ev;
+			nCurrentEvents++;
+		}
+		Ev = Ev + 1;
+	}
+		
+	Ev = 39;
+	// Determine if a state timer expired
+	TimeFromStart = CurrentTime - StateStartTime;
+	if ((TimeFromStart >= StateTimers[CurrentState]) && (MeaningfulStateTimer == true)) {		
+		CurrentEvent[nCurrentEvents] = Ev;
+		nCurrentEvents++;
+	}
+
+	// Now determine if a state transition should occur. The first event linked to a state transition takes priority.
+	byte StateTransitionFound = 0;
+	int i = 0;
+	while ((!StateTransitionFound) && (i < nCurrentEvents)) {			
+		NewStateIdx = InputStateMatrix[CurrentState][CurrentEvent[i]];	
+		if (NewStateIdx != CurrentState) {
+			StateTransitionFound = 1;
+		}				
+		i++;
+	}
+		// Store timestamp of events captured in this cycle
+	if ((nEvents + nCurrentEvents) < MaxTimestamps) {
+		for (int x = 0; x < nCurrentEvents; x++) {
+			eventTimeStamps[nEvents] = CurrentTime - MatrixStartTime; //CurrentTime;
+			Events[nEvents] = CurrentEvent[x]; // new
+			nEvents++;
+		}
+	}
+	// Make state transition if necessary
+	if (StateTransitionFound) {
+		if (nTransition < MaxTransitions) {
+			state_visited[nTransition++] = NewStateIdx;
+		}
+
+		if (NewStateIdx == stateNum) {
+			MatrixFinished = true;
+			Timer3.stop();
+		} else {
+			setStateOutputs(NewStateIdx);
+			StateStartTime = CurrentTime;
+			CurrentState = NewStateIdx;
+		}
+	} 
+	return;
+} // End timer handler
+
+
+void setStateOutputs(byte State) {
+	byte CurrentTimer = 0; // Used when referring to the timer currently being triggered
+	byte CurrentCounter = 0; // Used when referring to the counter currently being reset
+	valve_control(OutputStateMatrix[State][0]);        // Cols0 = Valves; Value: 0, 1, 2, 3
+	digitalWrite(BncOutputLines[0], OutputStateMatrix[State][1]);
+
+	// 9-16=PWM values 
+	if (OutputStateMatrix[State][9] == 255) {
+		pwm_pin53.start(PWM_PERIOD_PIN_53, PWM_DUTY_PIN_53);
+	}else {
+		stopGocue();
+	}
+	
+	if (OutputStateMatrix[State][10] == 255) {
+		pwm_pin44.start(PWM_PERIOD_PIN_44, PWM_DUTY_PIN_44);
+	}
+	
+	if (OutputStateMatrix[State][11] == 255) {
+		OptoStim();
+	}
+		
+	if (InputStateMatrix[State][39] != State) {
+		MeaningfulStateTimer = true;
+	} else {
+		MeaningfulStateTimer = false;
+	}
+}
+
