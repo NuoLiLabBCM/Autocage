@@ -1,4 +1,9 @@
 //combine Master,task and wave board. JL 11/19/2024
+//from protocol 19, start optostim for 15% trials using 3 laser power levels in 3 different periods (sample, delay and response) randomly
+
+/* Connection Circuit:
+  Controller.SerialUSB <<======>> PC (data and/or debug info)
+*/
 
 #include <string.h>
 #include <SD.h>        // SD card
@@ -11,10 +16,6 @@
 #include <Adafruit_MCP4725.h>
 
 #include <SPI.h>
-
-/* Connection Circuit:
-  Controller.SerialUSB <<======>> PC (data and/or debug info)
-*/
 
 //*********************************************************************************************************/
 //***************************************** Head-Fixation related *****************************************/
@@ -126,6 +127,7 @@ const uint16_t ultra_ramp_sine[200] = {4064, 4007, 3924, 3818, 3689, 3540, 3373,
 
 float powerWeight = 1.0;
 byte laserByte = 2; // 1-using thorlab laser; 2-using Ultra laser
+byte isTimer4started = 0;
 
 typedef struct {
   int trig_counter                      = 0;    // Switch triggered counter
@@ -479,6 +481,8 @@ void setup() {
 
 	Timer3.attachInterrupt(handler);
 	Timer3.setPeriod(100); // Runs every 100us
+	
+	NVIC_SetPriority(TC3_IRQn, 0);  // set Timer3 highest priority.
 ////End 11/19/2024
 
   analogReadResolution(8);   // Max: 12
@@ -788,6 +792,12 @@ void loop() {
 		stopMaskingflash();
 		stopGocue();	
 		digitalWrite(BncOutputLines[0], LOW);
+		if (isTimer4started == 1) {
+			Timer4.stop();
+			dac.setVoltage(0, false);
+			isTimer4started = 0; 
+		}
+			
 		
       // stop head-fixation
       if (headfixation_flag == 1) { // release head-fixation
@@ -1268,8 +1278,9 @@ int send_protocol_to_Bpod_and_Run() {
         states[0]  = CreateState("TrigTrialStart",    0.1,                      1, TrigTrialStart_Cond,  1, TrigTrialStart_Output);
 
 		powerWeight = 0;        
-		laserByte = 2; // 1-Thorlab; 2-UltraLaser		
-        if (random(100) < 15) {  //15    10% trials to stim
+		laserByte = 2; // 1-Thorlab; 2-UltraLaser
+		isTimer4started = 0;
+        if (random(100) < 15) {      //15% trials to stim
           int randomNum = random(300);
           if (randomNum < 100) {
             weightByte = 10;  // percent
@@ -1280,10 +1291,10 @@ int send_protocol_to_Bpod_and_Run() {
           }
 		  powerWeight = (float)weightByte / 100;
 
-          randomNum = random(300);   ;
+          randomNum = random(300);  
           if (randomNum < 100) { // 1/3 sample
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    2, Sample_Pole_Stim_Output);
-            states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 2, Sample_Pole_Stim_Output);
+            states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
             states[4]  = CreateState("EarlyLickDelay",    0.05,                     1, EarlyLickDelay_Cond,  0, NoOutput);
             states[5]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     1, ResponseCue_Output);
@@ -1296,7 +1307,7 @@ int send_protocol_to_Bpod_and_Run() {
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     1, OptoStim_Output);
-            states[4]  = CreateState("EarlyLickDelay",    0.05,                     1, EarlyLickDelay_Cond,  1, OptoStim_Output);
+            states[4]  = CreateState("EarlyLickDelay",    0.05,                     1, EarlyLickDelay_Cond,  0, NoOutput);
             states[5]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     1, ResponseCue_Output);
             states[6]  = CreateState("GiveRightDrop",     Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveRightDrop_Output);
             states[7]  = CreateState("GiveLeftDrop",      Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveLeftDrop_Output);
@@ -1308,7 +1319,7 @@ int send_protocol_to_Bpod_and_Run() {
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
             states[4]  = CreateState("EarlyLickDelay",    0.05,                     1, EarlyLickDelay_Cond,  0, NoOutput);
-            states[5]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     2, ResponseCueStim_Output);
+            states[5]  = CreateState("ResponseCue",       0.1,                      1, ResponseCue_Cond,     1, ResponseCue_Output);
             states[6]  = CreateState("GiveRightDrop",     Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveRightDrop_Output);
             states[7]  = CreateState("GiveLeftDrop",      Reward_duration_behavior, 1, GiveFreeDrop_Cond,    1, GiveLeftDrop_Output);
             states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    1, OptoStim_Output);
@@ -3253,6 +3264,7 @@ void OptoStim() {
       dac.setVoltage(uint16_t(powerWeight * (ultra_flat_sine[0] - 655) + 655), false); // 655 is 0.8 V
     }
     Timer4.start();
+	isTimer4started = 1; 
 }
 
 void timer_updateDAC() { // total 1.3 sec stim
@@ -3371,7 +3383,9 @@ void setStateOutputs(byte State) {
 	}
 	
 	if (OutputStateMatrix[State][11] == 255) {
-		OptoStim();
+		if (isTimer4started == 0) {
+			OptoStim();
+		}
 	}
 		
 	if (InputStateMatrix[State][39] != State) {

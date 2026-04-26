@@ -177,7 +177,7 @@ void timer_wait_inter_trial() {
 	sample_ind = 0;
 }
 
-void timer_updateDAC() { // total 1.3 sec stim
+void timer_updateDAC() { 
   sample_ind ++;
   
     if (stimpin_state ==1 && sample_ind == 200) {

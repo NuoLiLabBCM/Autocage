@@ -1,19 +1,9 @@
 /*
-  Reverse Contingency Task for v1.0
-
-  Training will stay in protocol 4 (sample) and reverse contingency once perf > 80%
-
-  ParaS file need to append contingency (byte) and contingency_trial (unsigned int)
-  trial.txt file include contingency and contingency_trial
-
+  From protocol 18, add early-lick to the performence checking 
+  From protocol 19, start reversal contingency, and 
+  After the number of reversals exceeds 2, begin alternating between “100 trials without optostim” and “100 trials with optostim,” using a 10% laser power level applied from the response period until approximately 600 ms after the trial ends.
+  Use response_trial to calculate Perf100 and Earlylick100.
 */
-
-#include <string.h>
-#include <SD.h>        // SD card
-#include <DueTimer.h>  // Timer interrupt
-#include "RTClib.h"    // real time clock
-#include "HX711.h"     // weighting amplifier libirary
-//#include <math.h>
 
 /* Connection Circuit:
   Controller.SerialUSB <<======>> PC (data and/or debug info)
@@ -22,6 +12,14 @@
                                  vv
   Controller.Serial2   <<======>> waveSurfer.Serial2 (powerWeight: 0-100%)
 */
+
+
+#include <string.h>
+#include <SD.h>        // SD card
+#include <DueTimer.h>  // Timer interrupt
+#include "RTClib.h"    // real time clock
+#include "HX711.h"     // weighting amplifier libirary
+//#include <math.h>
 
 /*********************************************************************************************************/
 /***************************************** Head-Fixation related *****************************************/

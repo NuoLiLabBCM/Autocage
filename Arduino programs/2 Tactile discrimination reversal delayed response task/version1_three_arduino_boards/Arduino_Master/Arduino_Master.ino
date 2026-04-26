@@ -1,11 +1,9 @@
 /*
-  Modified from Reverse Contingency Task v1.0
-
-  Training will stay in protocol 4 (sample) and reverse contingency once perf > 80%
-
-  ParaS file need to append contingency (byte) and contingency_trial (unsigned int)
-  trial.txt file include contingency and contingency_trial
-
+  From protocol 19, start reversal contingency, and 
+  After reversal number >2, start optostim for 20% trials using 2 laser power levels in 2 different periods (sample and response) randomly.
+  Use response_trial to calculate Perf100.
+  ParaS file include contingency (byte) and contingency_trial (unsigned int).
+  trial.txt file include contingency and contingency_trial.
 */
 
 #include <string.h>
@@ -336,6 +334,8 @@ int paused          = 0;
 byte ledState       = LOW;
 bool Receiving_data_from_Bpod  = 0;
 bool sdcard = 0;
+
+byte response_trial = 100;
 
 unsigned long last_reward_time = 0;
 int timed_drop_count = 0;
@@ -1269,7 +1269,7 @@ int send_protocol_to_Bpod_and_Run() {
         State states[16] = {};
         states[0]  = CreateState("TrigTrialStart",    0.1,                      1, TrigTrialStart_Cond,  1, TrigTrialStart_Output);
 
-        if (reverse_num > 2 && random(100) < 21) {  // 20% trials to stim
+        if (reverse_num > 2 && random(100) < 21) {// 20% trials to stim
 
           int randomNum = random(300);
           if (randomNum < 150) {
@@ -1286,7 +1286,7 @@ int send_protocol_to_Bpod_and_Run() {
           Serial2.write(laserByte);
 
           randomNum = random(300); // only sample and response stim
-          if (randomNum < 150) { // 1/3 sample
+          if (randomNum < 150) { // 1/2 sample
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    2, Sample_Pole_Stim_Output);
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 2, Sample_Pole_Stim_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
@@ -1297,7 +1297,7 @@ int send_protocol_to_Bpod_and_Run() {
             states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    0, NoOutput);
             // mark this trial as stim trial...sample
             trial_stim_index = weightByte + 1; // 11, 31, 51, 71, 101
-          } else if (randomNum < 150) {// 1/3 delay
+          } else if (randomNum < 150) {// 0/3 delay
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     1, OptoStim_Output);
@@ -1308,7 +1308,7 @@ int send_protocol_to_Bpod_and_Run() {
             states[8]  = CreateState("AnswerPeriod",      AnswerPeriod_behavior,    3, AnswerPeriod_Cond,    0, NoOutput);
             // mark this trial as stim trial...delay
             trial_stim_index = weightByte + 2; // 12, 32, 52, 72, 102
-          } else {// 1/3 response
+          } else {// 1/2 response
             states[1]  = CreateState("SamplePeriod",      S.SamplePeriod,           3, SamplePeriod_Cond,    1, Sample_Pole_Output);
             states[2]  = CreateState("EarlyLickSample",   0.05,                     1, EarlyLickSample_Cond, 1, Sample_Pole_Output);
             states[3]  = CreateState("DelayPeriod",       S.DelayPeriod,            3, DelayPeriod_Cond,     0, NoOutput);
@@ -1722,7 +1722,7 @@ int UpdatePerformance() {
   S.ProtocolHistory[S.ProtocolHistoryIndex].nTrials++;
 
   Perf100 = 0;
-  byte response_trial = 100;
+  response_trial = 100;
   for (int i = 0; i < RECORD_TRIALS; i++) {
     if (S.OutcomeHistory[i] == 0) {
       response_trial = response_trial - 1;
@@ -2111,7 +2111,7 @@ int autoChangeProtocol() {
 		SerialUSB.print("; contingency_trial: ");
 		SerialUSB.println(contingency_trial);
 	  }
-      if (contingency_trial > 300 && Perf100 > 75) {
+      if (contingency_trial > 300 && Perf100 > 75 && response_trial > 70) {
         contingency_trial = 0;
         if (contingency == 0) {
           contingency = 1;
